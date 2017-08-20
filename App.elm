@@ -1,17 +1,19 @@
-module App exposing (..)
+module Main exposing (..)
 
-import Html exposing (Html, div, text, program)
+import Html exposing (Html, button, div, text, program)
+import Html.Events exposing (onClick)
 
 
 -- MODEL
 
+
 type alias Model =
-    String
+    Int
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( "Hello", Cmd.none )
+    ( 0, Cmd.none )
 
 
 
@@ -19,7 +21,7 @@ init =
 
 
 type Msg
-    = NoOp
+    = Increment Int
 
 
 
@@ -29,7 +31,9 @@ type Msg
 view : Model -> Html Msg
 view model =
     div []
-        [ text model ]
+        [ button [ onClick (Increment 2) ] [ text "+" ]
+        , text (toString model)
+        ]
 
 
 
@@ -39,8 +43,8 @@ view model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        NoOp ->
-            ( model, Cmd.none )
+        Increment howMuch ->
+            ( model + howMuch, Cmd.none )
 
 
 

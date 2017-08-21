@@ -1,6 +1,8 @@
 module Main exposing (..)
 
 import Html exposing (Html, div, text, program)
+import View exposing (view)
+import Update exposing (update)
 
 
 -- MODEL
@@ -21,28 +23,6 @@ init =
 
 type Msg
     = NoOp
-
-
-
--- VIEW
-
-
-view : Model -> Html Msg
-view model =
-    div []
-        [ text model ]
-
-
-
--- UPDATE
-
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        NoOp ->
-            ( model, Cmd.none )
-
 
 
 -- SUBSCRIPTIONS

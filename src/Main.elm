@@ -1,31 +1,15 @@
 module Main exposing (..)
 
-import Html exposing (Html, div, text, program)
-import View exposing (view)
+import Html exposing (program)
+import Msgs exposing (Msg)
+import Models exposing (Model)
 import Update exposing (update)
-
-
--- MODEL
-
-
-type alias Model =
-    String
+import View exposing (view)
 
 
 init : ( Model, Cmd Msg )
 init =
     ( "Hello", Cmd.none )
-
-
-
--- MESSAGES
-
-
-type Msg
-    = NoOp
-
-
--- SUBSCRIPTIONS
 
 
 subscriptions : Model -> Sub Msg

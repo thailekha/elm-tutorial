@@ -1,0 +1,10 @@
+{
+  "name": "elm-practice",
+  "version": "1.0.0",
+  "main": "api.js",
+  "author": "thailekha <thailekha@yahoo.com>",
+  "license": "MIT",
+  "dependencies": {
+    "json-server": "0.9.5"
+  }
+}

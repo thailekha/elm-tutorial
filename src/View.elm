@@ -12,6 +12,8 @@ view model =
         [ page model ]
 
 
+-- Html Msg means that this Html element would produce messages tagged with Msg. We will see this when we introduce some interaction
+
 page : Model -> Html Msg
 page model =
     Players.List.view model.players

@@ -6,18 +6,26 @@ import Html.Events exposing (onInput, onClick)
 import RemoteData exposing (WebData)
 import Http
 import Json.Decode as Decode
-import Json.Decode.Pipeline exposing (decode, required)
+import Json.Decode.Pipeline exposing (decode, required, optional)
 
 
 -- MODEL
 
-type alias Vocab = 
-    { wordfind : List String
+
+type alias Wordfind =
+    { word : String
+    , def : List (Maybe String)
     }
+
+
+type alias Vocab =
+    { wordfind : List Wordfind
+    }
+
 
 type alias Model =
     { content : String
-    , result : WebData (Vocab)
+    , result : WebData Vocab
     }
 
 
@@ -33,7 +41,7 @@ init =
 type Msg
     = Change String
     | Curl
-    | OnResponse (WebData (Vocab))
+    | OnResponse (WebData Vocab)
 
 
 
@@ -42,45 +50,67 @@ type Msg
 
 view : Model -> Html Msg
 view model =
-  div []
-    [ input [ placeholder "Text to reverse", onInput Change ] []
-    , button [ onClick Curl ] [ text "Look!" ]
-    , div [] [maybeResult model.result]
-    ]
+    div []
+        [ input [ placeholder "Text to reverse", onInput Change ] []
+        , button [ onClick Curl ] [ text "Look!" ]
+        , div [] [ maybeResult model.result ]
+        ]
 
 
-maybeResult : (WebData Vocab) -> Html Msg
+maybeResult : WebData Vocab -> Html Msg
 maybeResult response =
     case response of
         RemoteData.NotAsked ->
             text "Look up something ..."
+
         RemoteData.Loading ->
             text "Loading..."
+
         RemoteData.Success vocab ->
-            vocabList vocab
+            vocabHtml vocab
+
         RemoteData.Failure error ->
             text (toString error)
 
 
-vocabList : Vocab -> Html Msg
-vocabList vocab =
+vocabHtml : Vocab -> Html Msg
+vocabHtml vocab =
     -- notice that 2nd [] here is replaced with (List.map ...)
-    div [] 
-    [
-      h5 [] 
-      [
-        vocab.wordfind 
-            |> List.length
-            |> toString 
-            |> (++) "Found "
+    div []
+        [ h5 []
+            [ vocab.wordfind
+                |> List.length
+                |> toString
+                |> (++) "Found "
+                |> text
+            ]
+        , ul []
+            (vocab.wordfind
+                |> List.map wordfindHtml
+            )
+        ]
+
+
+wordfindHtml : Wordfind -> Html Msg
+wordfindHtml wordfind =
+    li []
+        [ wordfind.def
+            |> List.map (\defItem -> wordfindDef defItem)
+            |> toString
+            |> (++) wordfind.word
             |> text
-      ]
-    , ul [] 
-      (
-        vocab.wordfind
-            |> List.map (\word -> li [] [text word])
-      )
-    ]
+        ]
+
+
+wordfindDef : Maybe String -> String
+wordfindDef def =
+    case def of
+        Nothing ->
+            "error"
+
+        Just defStr ->
+            defStr
+
 
 
 -- UPDATE
@@ -90,28 +120,42 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Change newContent ->
-            ({ model | content = newContent }, Cmd.none )
+            ( { model | content = newContent }, Cmd.none )
+
         Curl ->
-            ({ model | result = RemoteData.Loading }, curl model.content )
+            ( { model | result = RemoteData.Loading }, curl model.content )
+
         OnResponse response ->
-            ({ model | result = response }, Cmd.none )
+            ( { model | result = response }, Cmd.none )
+
 
 
 -- COMMANDS
 
 
 curl : String -> Cmd Msg
-curl query = 
+curl query =
     Http.get ("http://localhost:4000/lookupword?w=" ++ query) vocabDecoder
         |> RemoteData.sendRequest
         |> Cmd.map OnResponse
 
 
+
 --https://github.com/NoRedInk/elm-decode-pipeline
+
+
 vocabDecoder : Decode.Decoder Vocab
 vocabDecoder =
     decode Vocab
-        |> required "wordfind" (Decode.list Decode.string)
+        |> required "wordfind" (Decode.list wordfindDecoder)
+
+
+wordfindDecoder : Decode.Decoder Wordfind
+wordfindDecoder =
+    decode Wordfind
+        |> required "word" Decode.string
+        |> optional "def" (Decode.list (Decode.maybe Decode.string)) []
+
 
 
 -- SUBSCRIPTIONS

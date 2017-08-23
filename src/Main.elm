@@ -44,6 +44,7 @@ type Msg
     = Change String
     | Curl
     | ToggleDef
+    | Remove String
     | OnResponse (WebData Vocab)
 
 
@@ -109,14 +110,16 @@ vocabHtml showDef vocab =
 wordDataHtml : Bool -> WordData -> Html Msg
 wordDataHtml showDef wordData =
     li []
-        [ if showDef then
+        [ button [ onClick (Remove wordData.word) ] [ text "x" ]
+        , (if showDef then
             wordData.def
                 |> List.map (\defItem -> wordDataDef defItem)
                 |> toString
                 |> (++) wordData.word
                 |> text
-          else
+           else
             text wordData.word
+          )
         ]
 
 
@@ -151,6 +154,11 @@ flip b =
             True
 
 
+removeWordData : Vocab -> String -> Vocab
+removeWordData vocab toRemove =
+    { vocab | wordfind = List.filter (\wordDataItem -> wordDataItem.word /= toRemove) vocab.wordfind }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -162,6 +170,16 @@ update msg model =
 
         ToggleDef ->
             ( { model | wordfindDef = (flip model.wordfindDef) }, Cmd.none )
+
+        Remove word ->
+            let
+                -- ( WebData Vocab, Cmd Msg )
+                -- notice that RemoteData.update takes Webdata
+                ( webdata, cmd ) =
+                    model.result
+                        |> RemoteData.update (\vocab -> ( removeWordData vocab word, Cmd.none ))
+            in
+                ( { model | result = webdata }, cmd )
 
         OnResponse response ->
             ( { model | result = response }, Cmd.none )

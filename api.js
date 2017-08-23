@@ -1,10 +1,13 @@
 var jsonServer = require('json-server')
 var request = require('superagent');
+var async = require('async');
 var cheerio = require('cheerio')
 var fs = require('fs');
 
 var path = process.cwd()+"/dict.txt";
-var url = 'http://www.wordfind.com/contains/';
+var wordfindUrl = 'http://www.wordfind.com/contains/';
+var cambridgeUrl = 'http://dictionary.cambridge.org/search/english-vietnamese/direct/?q=';
+
 var words = {};
 
 function processData(data, words) {
@@ -41,23 +44,53 @@ var server = jsonServer.create()
 // Set default middlewares (logger, static, cors and no-cache)
 server.use(jsonServer.defaults())
 
-server.get('/lookupword', function(req, res) {
-    request.get(url + req.query.w, function(err, response) {
+function doRequest(url, cheerioQuery, toMap, cb) {
+    request.get(url, function(err, response) {
         if (err) throw err;
-        var listItems = cheerio.load(response.text)('li.defLink');
+        //var listItems = cheerio.load(response.text)('span.w');
+        var listItems = cheerio.load(response.text)(cheerioQuery);
         var results = [];
         for (var key in listItems) {
             if(parseInt(key) >= 0) {
-                results = results.concat(listItems[key].children.map(function(aTag) {
+                results = results.concat(listItems[key].children.map(function(child) {
                     return {
-                        "word": aTag.children[0].data,
-                        "def": words[aTag.children[0].data.toLowerCase()]
+                        "word": toMap(child).data,
+                        "def": words[toMap(child).data.toLowerCase()]
                     };
                 }));
             }
         }
-        console.log({"wordfind": results});
-        res.json({"wordfind": results});
+        cb(results);
+    });
+}
+
+server.get('/lookupword', function(req, res) {
+    async.parallel({
+        wordfind(cb) {
+            doRequest(wordfindUrl + req.query.w, 'li.defLink',
+                function(child) {
+                    return child.children[0];
+                },
+                function(results) {
+                    cb(null, results);
+                });
+        },
+        cambridge(cb) {
+            doRequest(cambridgeUrl + req.query.w, 'span.w', 
+                function(child) {
+                    return child;
+                },
+                function(results) {
+                    cb(null, results);
+                });
+        }
+    },
+    function(err, results) {
+        // {
+        //     wordfind: [],
+        //     cambridge:[]
+        // }
+        res.json(results);
     });
 });
 

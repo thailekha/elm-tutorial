@@ -12,14 +12,15 @@ import Json.Decode.Pipeline exposing (decode, required, optional)
 -- MODEL
 
 
-type alias Wordfind =
+type alias WordData =
     { word : String
     , def : List (Maybe String)
     }
 
 
 type alias Vocab =
-    { wordfind : List Wordfind
+    { wordfind : List WordData
+    , cambridge : List WordData
     }
 
 
@@ -81,29 +82,47 @@ vocabHtml vocab =
             [ vocab.wordfind
                 |> List.length
                 |> toString
-                |> (++) "Found "
+                |> (++) "Found wordfind "
                 |> text
             ]
         , ul []
             (vocab.wordfind
-                |> List.map wordfindHtml
+                |> List.map wordDataHtml
+            )
+        , h5 []
+            [ vocab.cambridge
+                |> List.length
+                |> toString
+                |> (++) "Found cambridge "
+                |> text
+            ]
+        , ul []
+            (vocab.cambridge
+                |> List.map wordHtml
             )
         ]
 
 
-wordfindHtml : Wordfind -> Html Msg
-wordfindHtml wordfind =
+wordDataHtml : WordData -> Html Msg
+wordDataHtml wordData =
     li []
-        [ wordfind.def
-            |> List.map (\defItem -> wordfindDef defItem)
+        [ wordData.def
+            |> List.map (\defItem -> wordDataDef defItem)
             |> toString
-            |> (++) wordfind.word
+            |> (++) wordData.word
             |> text
         ]
 
 
-wordfindDef : Maybe String -> String
-wordfindDef def =
+wordHtml : WordData -> Html Msg
+wordHtml wordData =
+    li []
+        [ text wordData.word
+        ]
+
+
+wordDataDef : Maybe String -> String
+wordDataDef def =
     case def of
         Nothing ->
             "error"
@@ -147,12 +166,13 @@ curl query =
 vocabDecoder : Decode.Decoder Vocab
 vocabDecoder =
     decode Vocab
-        |> required "wordfind" (Decode.list wordfindDecoder)
+        |> required "wordfind" (Decode.list wordDataDecoder)
+        |> required "cambridge" (Decode.list wordDataDecoder)
 
 
-wordfindDecoder : Decode.Decoder Wordfind
-wordfindDecoder =
-    decode Wordfind
+wordDataDecoder : Decode.Decoder WordData
+wordDataDecoder =
+    decode WordData
         |> required "word" Decode.string
         |> optional "def" (Decode.list (Decode.maybe Decode.string)) []
 

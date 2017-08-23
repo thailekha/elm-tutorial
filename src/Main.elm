@@ -26,13 +26,14 @@ type alias Vocab =
 
 type alias Model =
     { content : String
+    , wordfindDef : Bool
     , result : WebData Vocab
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { content = "", result = RemoteData.NotAsked }, Cmd.none )
+    ( { content = "", wordfindDef = True, result = RemoteData.NotAsked }, Cmd.none )
 
 
 
@@ -42,6 +43,7 @@ init =
 type Msg
     = Change String
     | Curl
+    | ToggleDef
     | OnResponse (WebData Vocab)
 
 
@@ -54,12 +56,13 @@ view model =
     div []
         [ input [ placeholder "Text to reverse", onInput Change ] []
         , button [ onClick Curl ] [ text "Look!" ]
-        , div [] [ maybeResult model.result ]
+        , button [ onClick ToggleDef ] [ text "Definition" ]
+        , div [] [ maybeResult model.wordfindDef model.result ]
         ]
 
 
-maybeResult : WebData Vocab -> Html Msg
-maybeResult response =
+maybeResult : Bool -> WebData Vocab -> Html Msg
+maybeResult showDef response =
     case response of
         RemoteData.NotAsked ->
             text "Look up something ..."
@@ -68,14 +71,14 @@ maybeResult response =
             text "Loading..."
 
         RemoteData.Success vocab ->
-            vocabHtml vocab
+            vocabHtml showDef vocab
 
         RemoteData.Failure error ->
             text (toString error)
 
 
-vocabHtml : Vocab -> Html Msg
-vocabHtml vocab =
+vocabHtml : Bool -> Vocab -> Html Msg
+vocabHtml showDef vocab =
     -- notice that 2nd [] here is replaced with (List.map ...)
     div []
         [ h5 []
@@ -87,7 +90,7 @@ vocabHtml vocab =
             ]
         , ul []
             (vocab.wordfind
-                |> List.map wordDataHtml
+                |> List.map (wordDataHtml showDef)
             )
         , h5 []
             [ vocab.cambridge
@@ -103,14 +106,17 @@ vocabHtml vocab =
         ]
 
 
-wordDataHtml : WordData -> Html Msg
-wordDataHtml wordData =
+wordDataHtml : Bool -> WordData -> Html Msg
+wordDataHtml showDef wordData =
     li []
-        [ wordData.def
-            |> List.map (\defItem -> wordDataDef defItem)
-            |> toString
-            |> (++) wordData.word
-            |> text
+        [ if showDef then
+            wordData.def
+                |> List.map (\defItem -> wordDataDef defItem)
+                |> toString
+                |> (++) wordData.word
+                |> text
+          else
+            text wordData.word
         ]
 
 
@@ -135,6 +141,16 @@ wordDataDef def =
 -- UPDATE
 
 
+flip : Bool -> Bool
+flip b =
+    case b of
+        True ->
+            False
+
+        False ->
+            True
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -143,6 +159,9 @@ update msg model =
 
         Curl ->
             ( { model | result = RemoteData.Loading }, curl model.content )
+
+        ToggleDef ->
+            ( { model | wordfindDef = (flip model.wordfindDef) }, Cmd.none )
 
         OnResponse response ->
             ( { model | result = response }, Cmd.none )

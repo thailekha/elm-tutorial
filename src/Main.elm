@@ -6,7 +6,7 @@ import Html.Events exposing (onInput, onClick)
 import RemoteData exposing (WebData)
 import Http
 import Json.Decode as Decode
-import Json.Decode.Pipeline exposing (decode, required, optional)
+import Json.Decode.Pipeline exposing (decode, required, optional, hardcoded)
 
 
 -- MODEL
@@ -15,6 +15,7 @@ import Json.Decode.Pipeline exposing (decode, required, optional)
 type alias WordData =
     { word : String
     , def : List (Maybe String)
+    , selected : Bool
     }
 
 
@@ -33,7 +34,12 @@ type alias Model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( { content = "", wordfindDef = True, result = RemoteData.NotAsked }, Cmd.none )
+    ( { content = ""
+      , wordfindDef = True
+      , result = RemoteData.NotAsked
+      }
+    , Cmd.none
+    )
 
 
 
@@ -45,6 +51,8 @@ type Msg
     | Curl
     | ToggleDef
     | Remove String
+      --| SelectAll
+      --| DiselectAll
     | OnResponse (WebData Vocab)
 
 
@@ -78,56 +86,74 @@ maybeResult showDef response =
             text (toString error)
 
 
+countHeader : List a -> String -> Html Msg
+countHeader theList src =
+    h5 []
+        [ theList
+            |> List.length
+            |> toString
+            |> (++) ("Found " ++ src ++ " ")
+            |> text
+        ]
+
+
 vocabHtml : Bool -> Vocab -> Html Msg
 vocabHtml showDef vocab =
     -- notice that 2nd [] here is replaced with (List.map ...)
     div []
-        [ h5 []
-            [ vocab.wordfind
-                |> List.length
-                |> toString
-                |> (++) "Found wordfind "
-                |> text
+        [ countHeader vocab.wordfind "wordfind"
+        , vocab.wordfind
+            |> List.map (wordDataRow showDef)
+            |> vocabTable
+        , countHeader vocab.cambridge "cambridge"
+        , vocab.cambridge
+            |> List.map (wordDataRow showDef)
+            |> vocabTable
+        ]
+
+
+vocabTable : List (Html Msg) -> Html Msg
+vocabTable rows =
+    table []
+        [ thead []
+            [ tr []
+                [ th []
+                    [ text "Ignore", button [] [ text "Diselect all" ] ]
+                , th []
+                    [ text "Save", button [] [ text "Select all" ] ]
+                ]
             ]
-        , ul []
-            (vocab.wordfind
-                |> List.map (wordDataHtml showDef)
+        , tbody []
+            rows
+        ]
+
+
+wordDataRow : Bool -> WordData -> Html Msg
+wordDataRow showDef wordData =
+    let
+        ( show, hide ) =
+            ( td []
+                [ button [ onClick (Remove wordData.word) ] [ text "x" ]
+                , (if showDef then
+                    wordData.def
+                        |> List.map (\defItem -> wordDataDef defItem)
+                        |> toString
+                        |> (++) wordData.word
+                        |> text
+                   else
+                    text wordData.word
+                  )
+                ]
+            , td []
+                [ text "" ]
             )
-        , h5 []
-            [ vocab.cambridge
-                |> List.length
-                |> toString
-                |> (++) "Found cambridge "
-                |> text
-            ]
-        , ul []
-            (vocab.cambridge
-                |> List.map wordHtml
-            )
-        ]
+    in
+        case wordData.selected of
+            True ->
+                tr [] [ hide, show ]
 
-
-wordDataHtml : Bool -> WordData -> Html Msg
-wordDataHtml showDef wordData =
-    li []
-        [ button [ onClick (Remove wordData.word) ] [ text "x" ]
-        , (if showDef then
-            wordData.def
-                |> List.map (\defItem -> wordDataDef defItem)
-                |> toString
-                |> (++) wordData.word
-                |> text
-           else
-            text wordData.word
-          )
-        ]
-
-
-wordHtml : WordData -> Html Msg
-wordHtml wordData =
-    li []
-        [ text wordData.word
-        ]
+            False ->
+                tr [] [ show, hide ]
 
 
 wordDataDef : Maybe String -> String
@@ -212,6 +238,7 @@ wordDataDecoder =
     decode WordData
         |> required "word" Decode.string
         |> optional "def" (Decode.list (Decode.maybe Decode.string)) []
+        |> hardcoded False
 
 
 

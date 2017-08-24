@@ -50,9 +50,9 @@ type Msg
     = Change String
     | Curl
     | ToggleDef
-    | Remove String
-      --| SelectAll
-      --| DiselectAll
+    | ToggleSelect String
+    | SelectAll
+    | DiselectAll
     | OnResponse (WebData Vocab)
 
 
@@ -118,9 +118,9 @@ vocabTable rows =
         [ thead []
             [ tr []
                 [ th []
-                    [ text "Ignore", button [] [ text "Diselect all" ] ]
+                    [ text "Ignore", button [ onClick DiselectAll ] [ text "Diselect all" ] ]
                 , th []
-                    [ text "Save", button [] [ text "Select all" ] ]
+                    [ text "Save", button [ onClick SelectAll ] [ text "Select all" ] ]
                 ]
             ]
         , tbody []
@@ -133,7 +133,7 @@ wordDataRow showDef wordData =
     let
         ( show, hide ) =
             ( td []
-                [ button [ onClick (Remove wordData.word) ] [ text "x" ]
+                [ button [ onClick (ToggleSelect wordData.word) ] [ text ">" ]
                 , (if showDef then
                     wordData.def
                         |> List.map (\defItem -> wordDataDef defItem)
@@ -180,9 +180,47 @@ flip b =
             True
 
 
-removeWordData : Vocab -> String -> Vocab
-removeWordData vocab toRemove =
-    { vocab | wordfind = List.filter (\wordDataItem -> wordDataItem.word /= toRemove) vocab.wordfind }
+selectWordData : Vocab -> String -> Vocab
+selectWordData vocab toSelect =
+    let
+        apply =
+            List.map
+                (\wordDataItem ->
+                    if wordDataItem.word == toSelect then
+                        { wordDataItem | selected = flip wordDataItem.selected }
+                    else
+                        wordDataItem
+                )
+    in
+        { vocab
+            | wordfind = apply vocab.wordfind
+            , cambridge = apply vocab.cambridge
+        }
+
+
+setSelect : Vocab -> Bool -> Vocab
+setSelect vocab boolean =
+    let
+        apply =
+            List.map
+                (\wordDataItem ->
+                    { wordDataItem | selected = boolean }
+                )
+    in
+        { vocab
+            | wordfind = apply vocab.wordfind
+            , cambridge = apply vocab.cambridge
+        }
+
+
+remoteDataUpdate : Model -> (Vocab -> Vocab) -> ( Model, Cmd Msg )
+remoteDataUpdate model apply =
+    let
+        ( webdata, cmd ) =
+            model.result
+                |> RemoteData.update (\vocab -> ( apply vocab, Cmd.none ))
+    in
+        ( { model | result = webdata }, cmd )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -197,15 +235,14 @@ update msg model =
         ToggleDef ->
             ( { model | wordfindDef = (flip model.wordfindDef) }, Cmd.none )
 
-        Remove word ->
-            let
-                -- ( WebData Vocab, Cmd Msg )
-                -- notice that RemoteData.update takes Webdata
-                ( webdata, cmd ) =
-                    model.result
-                        |> RemoteData.update (\vocab -> ( removeWordData vocab word, Cmd.none ))
-            in
-                ( { model | result = webdata }, cmd )
+        ToggleSelect word ->
+            remoteDataUpdate model (\vocab -> selectWordData vocab word)
+
+        SelectAll ->
+            remoteDataUpdate model (\vocab -> setSelect vocab True)
+
+        DiselectAll ->
+            remoteDataUpdate model (\vocab -> setSelect vocab False)
 
         OnResponse response ->
             ( { model | result = response }, Cmd.none )

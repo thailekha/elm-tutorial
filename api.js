@@ -1,14 +1,79 @@
-var jsonServer = require('json-server')
+var jsonServer = require('json-server');
 var request = require('superagent');
 var async = require('async');
-var cheerio = require('cheerio')
+var cheerio = require('cheerio');
+var _ = require('lodash');
 var fs = require('fs');
+require('dotenv').config();
 
-var path = process.cwd()+"/dict.txt";
+var path = process.cwd() + "/dict.txt";
+var words = {};
+var wordnikAuthUrl = 'http://api.wordnik.com/v4/account.json/authenticate/';
+var wordnikToken = '';
+
 var wordfindUrl = 'http://www.wordfind.com/contains/';
 var cambridgeUrl = 'http://dictionary.cambridge.org/search/english-vietnamese/direct/?q=';
+var wordnikUrl = 'https://api.wordnik.com/v4/word.json/';
+var wordnikQueries = '/relatedWords?useCanonical=true&relationshipTypes='
 
-var words = {};
+// Returns an Express server
+var server = jsonServer.create()
+
+// Set default middlewares (logger, static, cors and no-cache)
+server.use(jsonServer.defaults())
+
+server.get('/lookupword', function(req, res) {
+    async.parallel({
+        wordfind(cb) {
+            reqCheerio(wordfindUrl + req.query.w, 'li.defLink',
+                function(child) {
+                    return child.children[0];
+                },
+                function(results) {
+                    cb(null, results);
+                });
+        },
+        cambridge(cb) {
+            reqCheerio(cambridgeUrl + req.query.w, 'span.w', 
+                function(child) {
+                    return child;
+                },
+                function(results) {
+                    cb(null, results);
+                });
+        },
+        synonyms(cb) {
+            request
+                .get(wordnikUrl + req.query.w + wordnikQueries + 'synonym' + '&api_key=' + process.env.API_KEY)
+                .set('Accept', 'application/json')
+                .end(function(err, res) {
+                    if (err) throw err;
+                    cb(null, formatWordnikResponse(res.body));
+                });
+        },
+        antonyms(cb) {
+            request
+                .get(wordnikUrl + req.query.w + wordnikQueries + 'antonym' + '&api_key=' + process.env.API_KEY)
+                .set('Accept', 'application/json')
+                .end(function(err, res) {
+                    if (err) throw err;
+                    cb(null, formatWordnikResponse(res.body));
+                });
+        }
+    },
+    function(err, results) {
+        // {
+        //     wordfind: [],
+        //     cambridge:[],
+        //     synonyms: [],
+        //     antonyms: []
+        // }
+        res.json(results);
+    });
+});
+
+var router = jsonServer.router('db.json')
+server.use(router);
 
 function processData(data, words) {
     data
@@ -36,15 +101,31 @@ function processData(data, words) {
         });
 }
 
-processData(fs.readFileSync(path, 'utf-8'), words);
+function initServer(server, dictionaryPath, words, wordnikAuthUrl, username, password, apikey, wordnikToken) {
+    processData(fs.readFileSync(dictionaryPath, 'utf-8'), words);
+    request
+        .get(wordnikAuthUrl + username + '?password=' + password + '&api_key=' + apikey)
+        .set('Accept', 'application/json')
+        .end(function(err, res) {
+            if (err) throw err;
+            wordnikToken = res.body;
 
-// Returns an Express server
-var server = jsonServer.create()
+            console.log('Server initialized, Listening at 4000');
+            server.listen(4000);
+        });
+}
 
-// Set default middlewares (logger, static, cors and no-cache)
-server.use(jsonServer.defaults())
+function formatWordnikResponse(body) {
+    return _.flatten(body.map(function(wordnikRes) {
+        return wordnikRes.words;
+    })).map(function(word) {
+        return {
+            "word": word
+        }
+    });
+}
 
-function doRequest(url, cheerioQuery, toMap, cb) {
+function reqCheerio(url, cheerioQuery, toMap, cb) {
     request.get(url, function(err, response) {
         if (err) throw err;
         //var listItems = cheerio.load(response.text)('span.w');
@@ -64,38 +145,4 @@ function doRequest(url, cheerioQuery, toMap, cb) {
     });
 }
 
-server.get('/lookupword', function(req, res) {
-    async.parallel({
-        wordfind(cb) {
-            doRequest(wordfindUrl + req.query.w, 'li.defLink',
-                function(child) {
-                    return child.children[0];
-                },
-                function(results) {
-                    cb(null, results);
-                });
-        },
-        cambridge(cb) {
-            doRequest(cambridgeUrl + req.query.w, 'span.w', 
-                function(child) {
-                    return child;
-                },
-                function(results) {
-                    cb(null, results);
-                });
-        }
-    },
-    function(err, results) {
-        // {
-        //     wordfind: [],
-        //     cambridge:[]
-        // }
-        res.json(results);
-    });
-});
-
-var router = jsonServer.router('db.json')
-server.use(router);
-
-console.log('Listening at 4000')
-server.listen(4000)
+initServer(server, path, words, wordnikAuthUrl, process.env.USERNAME, process.env.PASSWORD, process.env.API_KEY, wordnikToken);

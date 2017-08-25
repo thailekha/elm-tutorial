@@ -22,6 +22,8 @@ type alias WordData =
 type alias Vocab =
     { wordfind : List WordData
     , cambridge : List WordData
+    , synonyms : List WordData
+    , antonyms : List WordData
     }
 
 
@@ -109,6 +111,14 @@ vocabHtml showDef vocab =
         , vocab.cambridge
             |> List.map (wordDataRow showDef)
             |> vocabTable
+        , countHeader vocab.synonyms "synonyms"
+        , vocab.synonyms
+            |> List.map (wordDataRow False)
+            |> vocabTable
+        , countHeader vocab.antonyms "antonyms"
+        , vocab.antonyms
+            |> List.map (wordDataRow False)
+            |> vocabTable
         ]
 
 
@@ -195,6 +205,8 @@ selectWordData vocab toSelect =
         { vocab
             | wordfind = apply vocab.wordfind
             , cambridge = apply vocab.cambridge
+            , synonyms = apply vocab.synonyms
+            , antonyms = apply vocab.antonyms
         }
 
 
@@ -210,6 +222,8 @@ setSelect vocab boolean =
         { vocab
             | wordfind = apply vocab.wordfind
             , cambridge = apply vocab.cambridge
+            , synonyms = apply vocab.synonyms
+            , antonyms = apply vocab.antonyms
         }
 
 
@@ -268,6 +282,8 @@ vocabDecoder =
     decode Vocab
         |> required "wordfind" (Decode.list wordDataDecoder)
         |> required "cambridge" (Decode.list wordDataDecoder)
+        |> required "synonyms" (Decode.list wordDataDecoder)
+        |> required "antonyms" (Decode.list wordDataDecoder)
 
 
 wordDataDecoder : Decode.Decoder WordData

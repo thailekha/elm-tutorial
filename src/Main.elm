@@ -1,12 +1,14 @@
 module Main exposing (..)
 
 import Html exposing (..)
-import Html.Attributes exposing (placeholder)
+import Html.Attributes exposing (placeholder, href)
 import Html.Events exposing (onInput, onClick)
 import RemoteData exposing (WebData)
 import Http
 import Json.Decode as Decode
 import Json.Decode.Pipeline exposing (decode, required, optional, hardcoded)
+import Navigation exposing (Location)
+import UrlParser
 
 
 -- MODEL
@@ -31,15 +33,52 @@ type alias Model =
     { content : String
     , wordfindDef : Bool
     , result : WebData Vocab
+    , route : Route
     }
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( { content = ""
-      , wordfindDef = True
-      , result = RemoteData.NotAsked
-      }
+type Route
+    = Contain
+    | Family
+    | Synonyms
+    | Antonyms
+    | NotFoundRoute
+
+
+matchers : UrlParser.Parser (Route -> a) a
+matchers =
+    UrlParser.oneOf
+        [ UrlParser.map Contain UrlParser.top
+        , UrlParser.map Family (UrlParser.s "family")
+        , UrlParser.map Synonyms (UrlParser.s "synonyms")
+        , UrlParser.map Antonyms (UrlParser.s "antonyms")
+        ]
+
+
+parseLocation : Location -> Route
+parseLocation location =
+    case (UrlParser.parseHash matchers location) of
+        Just route ->
+            route
+
+        Nothing ->
+            NotFoundRoute
+
+
+initModel : Route -> Model
+initModel route =
+    { content = ""
+    , wordfindDef = True
+    , result = RemoteData.NotAsked
+    , route = route
+    }
+
+
+init : Location -> ( Model, Cmd Msg )
+init location =
+    ( location
+        |> parseLocation
+        |> initModel
     , Cmd.none
     )
 
@@ -49,7 +88,8 @@ init =
 
 
 type Msg
-    = Change String
+    = OnLocationChange Location
+    | Change String
     | Curl
     | ToggleDef
     | ToggleSelect String
@@ -60,6 +100,59 @@ type Msg
 
 
 -- VIEW
+--highlightNav : Route -> Model -> string
+--highlightNav route model =
+
+
+nav : Model -> Html Msg
+nav model =
+    --make NavButton with selected boolean field to refactor this code
+    div []
+        [ a [ href "#/" ]
+            [ (case model.route of
+                Contain ->
+                    "*"
+
+                _ ->
+                    ""
+              )
+                |> (++) " Contain "
+                |> text
+            ]
+        , a [ href "#/family" ]
+            [ (case model.route of
+                Family ->
+                    "*"
+
+                _ ->
+                    ""
+              )
+                |> (++) " Family "
+                |> text
+            ]
+        , a [ href "#/synonyms" ]
+            [ (case model.route of
+                Synonyms ->
+                    "*"
+
+                _ ->
+                    ""
+              )
+                |> (++) " Synonyms "
+                |> text
+            ]
+        , a [ href "#/antonyms" ]
+            [ (case model.route of
+                Antonyms ->
+                    "*"
+
+                _ ->
+                    ""
+              )
+                |> (++) " Antonyms "
+                |> text
+            ]
+        ]
 
 
 view : Model -> Html Msg
@@ -68,12 +161,13 @@ view model =
         [ input [ placeholder "Text to reverse", onInput Change ] []
         , button [ onClick Curl ] [ text "Look!" ]
         , button [ onClick ToggleDef ] [ text "Definition" ]
-        , div [] [ maybeResult model.wordfindDef model.result ]
+        , nav model
+        , div [] [ maybeResult model model.result ]
         ]
 
 
-maybeResult : Bool -> WebData Vocab -> Html Msg
-maybeResult showDef response =
+maybeResult : Model -> WebData Vocab -> Html Msg
+maybeResult model response =
     case response of
         RemoteData.NotAsked ->
             text "Look up something ..."
@@ -82,7 +176,7 @@ maybeResult showDef response =
             text "Loading..."
 
         RemoteData.Success vocab ->
-            vocabHtml showDef vocab
+            vocabHtml model.route model.wordfindDef vocab
 
         RemoteData.Failure error ->
             text (toString error)
@@ -99,27 +193,43 @@ countHeader theList src =
         ]
 
 
-vocabHtml : Bool -> Vocab -> Html Msg
-vocabHtml showDef vocab =
+vocabHtml : Route -> Bool -> Vocab -> Html Msg
+vocabHtml route showDef vocab =
     -- notice that 2nd [] here is replaced with (List.map ...)
     div []
-        [ countHeader vocab.wordfind "wordfind"
-        , vocab.wordfind
-            |> List.map (wordDataRow showDef)
-            |> vocabTable
-        , countHeader vocab.cambridge "cambridge"
-        , vocab.cambridge
-            |> List.map (wordDataRow showDef)
-            |> vocabTable
-        , countHeader vocab.synonyms "synonyms"
-        , vocab.synonyms
-            |> List.map (wordDataRow False)
-            |> vocabTable
-        , countHeader vocab.antonyms "antonyms"
-        , vocab.antonyms
-            |> List.map (wordDataRow False)
-            |> vocabTable
-        ]
+        (case route of
+            Contain ->
+                [ countHeader vocab.wordfind "wordfind"
+                , vocab.wordfind
+                    |> List.map (wordDataRow showDef)
+                    |> vocabTable
+                ]
+
+            Family ->
+                [ countHeader vocab.cambridge "cambridge"
+                , vocab.cambridge
+                    |> List.map (wordDataRow showDef)
+                    |> vocabTable
+                ]
+
+            Synonyms ->
+                [ countHeader vocab.synonyms "synonyms"
+                , vocab.synonyms
+                    |> List.map (wordDataRow False)
+                    |> vocabTable
+                ]
+
+            Antonyms ->
+                [ countHeader vocab.antonyms "antonyms"
+                , vocab.antonyms
+                    |> List.map (wordDataRow False)
+                    |> vocabTable
+                ]
+
+            NotFoundRoute ->
+                [ text "Route not found"
+                ]
+        )
 
 
 vocabTable : List (Html Msg) -> Html Msg
@@ -240,6 +350,9 @@ remoteDataUpdate model apply =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        OnLocationChange location ->
+            ( { model | route = (parseLocation location) }, Cmd.none )
+
         Change newContent ->
             ( { model | content = newContent }, Cmd.none )
 
@@ -309,7 +422,7 @@ subscriptions model =
 
 main : Program Never Model Msg
 main =
-    program
+    Navigation.program OnLocationChange
         { init = init
         , view = view
         , update = update

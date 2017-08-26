@@ -12,6 +12,7 @@ import UrlParser
 import Material
 import Material.Scheme
 import Material.Button as Button
+import Material.Textfield as Textfield
 import Material.Options as Options exposing (css)
 
 
@@ -162,12 +163,28 @@ nav model =
         ]
 
 
+
+----doesn't work
+--patchTextfield : (x -> Html Msg) -> Html Msg
+--patchTextfield tf =
+--    tf "some shit"
+
+
 view : Model -> Html Msg
 view model =
     div []
-        [ input [ placeholder "Text to reverse", onInput Change ] []
-        , Button.render Mdl
+        [ --input [ placeholder "Text to reverse", onInput Change ] []
+          (Textfield.render Mdl
             [ 0 ]
+            model.mdl
+            [ Textfield.label "word"
+            , Textfield.floatingLabel
+            , Options.onInput Change
+            ]
+          )
+            "JUST A PATCH HERE"
+        , Button.render Mdl
+            [ 1 ]
             model.mdl
             [ Options.onClick Curl
 
@@ -175,7 +192,7 @@ view model =
             ]
             [ text "Look!" ]
         , Button.render Mdl
-            [ 1 ]
+            [ 2 ]
             model.mdl
             [ Options.onClick ToggleDef ]
             [ text "Definition" ]

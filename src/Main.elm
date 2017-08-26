@@ -9,6 +9,10 @@ import Json.Decode as Decode
 import Json.Decode.Pipeline exposing (decode, required, optional, hardcoded)
 import Navigation exposing (Location)
 import UrlParser
+import Material
+import Material.Scheme
+import Material.Button as Button
+import Material.Options as Options exposing (css)
 
 
 -- MODEL
@@ -34,6 +38,7 @@ type alias Model =
     , wordfindDef : Bool
     , result : WebData Vocab
     , route : Route
+    , mdl : Material.Model
     }
 
 
@@ -71,6 +76,7 @@ initModel route =
     , wordfindDef = True
     , result = RemoteData.NotAsked
     , route = route
+    , mdl = Material.model
     }
 
 
@@ -96,6 +102,7 @@ type Msg
     | SelectAll
     | DiselectAll
     | OnResponse (WebData Vocab)
+    | Mdl (Material.Msg Msg)
 
 
 
@@ -159,11 +166,23 @@ view : Model -> Html Msg
 view model =
     div []
         [ input [ placeholder "Text to reverse", onInput Change ] []
-        , button [ onClick Curl ] [ text "Look!" ]
-        , button [ onClick ToggleDef ] [ text "Definition" ]
+        , Button.render Mdl
+            [ 0 ]
+            model.mdl
+            [ Options.onClick Curl
+
+            --, css "margin" "0 24px"
+            ]
+            [ text "Look!" ]
+        , Button.render Mdl
+            [ 1 ]
+            model.mdl
+            [ Options.onClick ToggleDef ]
+            [ text "Definition" ]
         , nav model
         , div [] [ maybeResult model model.result ]
         ]
+        |> Material.Scheme.top
 
 
 maybeResult : Model -> WebData Vocab -> Html Msg
@@ -373,6 +392,9 @@ update msg model =
 
         OnResponse response ->
             ( { model | result = response }, Cmd.none )
+
+        Mdl msg_ ->
+            Material.update Mdl msg_ model
 
 
 

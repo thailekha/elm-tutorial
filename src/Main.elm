@@ -1,5 +1,8 @@
 module Main exposing (..)
 
+import Array exposing (Array)
+import Dict exposing (Dict)
+import String
 import Html exposing (..)
 import Html.Attributes exposing (placeholder, href)
 import Html.Events exposing (onInput, onClick)
@@ -7,15 +10,18 @@ import RemoteData exposing (WebData)
 import Http
 import Json.Decode as Decode
 import Json.Decode.Pipeline exposing (decode, required, optional, hardcoded)
-import Navigation exposing (Location)
-import UrlParser
 import Material
 import Material.Scheme
 import Material.Button as Button
 import Material.Textfield as Textfield
+import Material.Tabs as Tabs
 import Material.Options as Options exposing (css)
+import Navigation
+import RouteUrl as Routing
 
 
+--see https://github.com/debois/elm-mdl/blob/master/demo/Demo.elm
+--see https://github.com/debois/elm-mdl/blob/master/demo/Demo/Tabs.elm
 -- MODEL
 
 
@@ -38,54 +44,19 @@ type alias Model =
     { content : String
     , wordfindDef : Bool
     , result : WebData Vocab
-    , route : Route
     , mdl : Material.Model
+    , selectedTab : Int
     }
 
 
-type Route
-    = Contain
-    | Family
-    | Synonyms
-    | Antonyms
-    | NotFoundRoute
-
-
-matchers : UrlParser.Parser (Route -> a) a
-matchers =
-    UrlParser.oneOf
-        [ UrlParser.map Contain UrlParser.top
-        , UrlParser.map Family (UrlParser.s "family")
-        , UrlParser.map Synonyms (UrlParser.s "synonyms")
-        , UrlParser.map Antonyms (UrlParser.s "antonyms")
-        ]
-
-
-parseLocation : Location -> Route
-parseLocation location =
-    case (UrlParser.parseHash matchers location) of
-        Just route ->
-            route
-
-        Nothing ->
-            NotFoundRoute
-
-
-initModel : Route -> Model
-initModel route =
-    { content = ""
-    , wordfindDef = True
-    , result = RemoteData.NotAsked
-    , route = route
-    , mdl = Material.model
-    }
-
-
-init : Location -> ( Model, Cmd Msg )
-init location =
-    ( location
-        |> parseLocation
-        |> initModel
+init : ( Model, Cmd Msg )
+init =
+    ( { content = ""
+      , wordfindDef = True
+      , result = RemoteData.NotAsked
+      , mdl = Material.model
+      , selectedTab = 1
+      }
     , Cmd.none
     )
 
@@ -95,8 +66,7 @@ init location =
 
 
 type Msg
-    = OnLocationChange Location
-    | Change String
+    = Change String
     | Curl
     | ToggleDef
     | ToggleSelect String
@@ -104,6 +74,59 @@ type Msg
     | DiselectAll
     | OnResponse (WebData Vocab)
     | Mdl (Material.Msg Msg)
+    | SelectTab Int
+
+
+
+-- ROUTING
+
+
+tabs : List ( String, String )
+tabs =
+    [ ( "Contains", "contains" )
+    , ( "Family", "family" )
+    , ( "Synonyms", "synonyms" )
+    , ( "Antonyms", "antonyms" )
+    ]
+
+
+tabUrls : Array String
+tabUrls =
+    List.map (\( _, x ) -> x) tabs |> Array.fromList
+
+
+urlTabs : Dict String Int
+urlTabs =
+    List.indexedMap (\idx ( _, x ) -> ( x, idx )) tabs |> Dict.fromList
+
+
+urlOf : Model -> String
+urlOf model =
+    "#" ++ (Array.get model.selectedTab tabUrls |> Maybe.withDefault "")
+
+
+delta2url : Model -> Model -> Maybe Routing.UrlChange
+delta2url model1 model2 =
+    if model1.selectedTab /= model2.selectedTab then
+        { entry = Routing.NewEntry
+        , url = urlOf model2
+        }
+            |> Just
+    else
+        Nothing
+
+
+location2messages : Navigation.Location -> List Msg
+location2messages location =
+    [ case location.hash |> String.dropLeft 1 of
+        "" ->
+            SelectTab 0
+
+        x ->
+            Dict.get x urlTabs
+                |> Maybe.withDefault -1
+                |> SelectTab
+    ]
 
 
 
@@ -114,52 +137,35 @@ type Msg
 
 nav : Model -> Html Msg
 nav model =
-    --make NavButton with selected boolean field to refactor this code
-    div []
-        [ a [ href "#/" ]
-            [ (case model.route of
-                Contain ->
-                    "*"
-
-                _ ->
-                    ""
-              )
-                |> (++) " Contain "
-                |> text
-            ]
-        , a [ href "#/family" ]
-            [ (case model.route of
-                Family ->
-                    "*"
-
-                _ ->
-                    ""
-              )
-                |> (++) " Family "
-                |> text
-            ]
-        , a [ href "#/synonyms" ]
-            [ (case model.route of
-                Synonyms ->
-                    "*"
-
-                _ ->
-                    ""
-              )
-                |> (++) " Synonyms "
-                |> text
-            ]
-        , a [ href "#/antonyms" ]
-            [ (case model.route of
-                Antonyms ->
-                    "*"
-
-                _ ->
-                    ""
-              )
-                |> (++) " Antonyms "
-                |> text
-            ]
+    Tabs.render Mdl
+        [ 0 ]
+        model.mdl
+        [ Tabs.ripple
+        , Tabs.onSelectTab SelectTab
+        , Tabs.activeTab model.selectedTab
+        ]
+        [ Tabs.label []
+            [ text "Contain" ]
+        , Tabs.label []
+            [ text "Family" ]
+        , Tabs.label []
+            [ text "Synonyms" ]
+        , Tabs.label []
+            [ text "Antonyms" ]
+        ]
+        [--Options.div
+         --    [ css "margin" "24px auto"
+         --    , css "align-items" "flex-start"
+         --    , Options.center
+         --    , css "overflow-y" "auto"
+         --    , css "height" "512px"
+         --    ]
+         --    [ case model.tab of
+         --        0 ->
+         --            aboutTab
+         --        _ ->
+         --            exampleTab
+         --    ]
         ]
 
 
@@ -212,10 +218,51 @@ maybeResult model response =
             text "Loading..."
 
         RemoteData.Success vocab ->
-            vocabHtml model.route model.wordfindDef vocab
+            --vocabHtml model.route model.wordfindDef vocab
+            text "Loaded"
 
         RemoteData.Failure error ->
             text (toString error)
+
+
+containView : Bool -> Vocab -> Html Msg
+containView showDef vocab =
+    div []
+        [ countHeader vocab.wordfind "wordfind"
+        , vocab.wordfind
+            |> List.map (wordDataRow showDef)
+            |> vocabTable
+        ]
+
+
+familyView : Bool -> Vocab -> Html Msg
+familyView showDef vocab =
+    div []
+        [ countHeader vocab.cambridge "cambridge"
+        , vocab.cambridge
+            |> List.map (wordDataRow showDef)
+            |> vocabTable
+        ]
+
+
+synonymsView : Bool -> Vocab -> Html Msg
+synonymsView showDef vocab =
+    div []
+        [ countHeader vocab.synonyms "synonyms"
+        , vocab.synonyms
+            |> List.map (wordDataRow False)
+            |> vocabTable
+        ]
+
+
+antonymsView : Bool -> Vocab -> Html Msg
+antonymsView showDef vocab =
+    div []
+        [ countHeader vocab.antonyms "antonyms"
+        , vocab.antonyms
+            |> List.map (wordDataRow False)
+            |> vocabTable
+        ]
 
 
 countHeader : List a -> String -> Html Msg
@@ -229,43 +276,10 @@ countHeader theList src =
         ]
 
 
-vocabHtml : Route -> Bool -> Vocab -> Html Msg
-vocabHtml route showDef vocab =
-    -- notice that 2nd [] here is replaced with (List.map ...)
-    div []
-        (case route of
-            Contain ->
-                [ countHeader vocab.wordfind "wordfind"
-                , vocab.wordfind
-                    |> List.map (wordDataRow showDef)
-                    |> vocabTable
-                ]
 
-            Family ->
-                [ countHeader vocab.cambridge "cambridge"
-                , vocab.cambridge
-                    |> List.map (wordDataRow showDef)
-                    |> vocabTable
-                ]
-
-            Synonyms ->
-                [ countHeader vocab.synonyms "synonyms"
-                , vocab.synonyms
-                    |> List.map (wordDataRow False)
-                    |> vocabTable
-                ]
-
-            Antonyms ->
-                [ countHeader vocab.antonyms "antonyms"
-                , vocab.antonyms
-                    |> List.map (wordDataRow False)
-                    |> vocabTable
-                ]
-
-            NotFoundRoute ->
-                [ text "Route not found"
-                ]
-        )
+--NotFoundRoute ->
+--    [ text "Route not found"
+--    ]
 
 
 vocabTable : List (Html Msg) -> Html Msg
@@ -386,9 +400,6 @@ remoteDataUpdate model apply =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        OnLocationChange location ->
-            ( { model | route = (parseLocation location) }, Cmd.none )
-
         Change newContent ->
             ( { model | content = newContent }, Cmd.none )
 
@@ -412,6 +423,9 @@ update msg model =
 
         Mdl msg_ ->
             Material.update Mdl msg_ model
+
+        SelectTab idx ->
+            ( { model | selectedTab = idx }, Cmd.none )
 
 
 
@@ -459,11 +473,13 @@ subscriptions model =
 -- MAIN
 
 
-main : Program Never Model Msg
+main : Routing.RouteUrlProgram Never Model Msg
 main =
-    Navigation.program OnLocationChange
-        { init = init
+    Routing.program
+        { delta2url = delta2url
+        , location2messages = location2messages
+        , init = init
         , view = view
-        , update = update
         , subscriptions = subscriptions
+        , update = update
         }

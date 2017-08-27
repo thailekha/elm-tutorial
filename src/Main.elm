@@ -4,7 +4,6 @@ import Array exposing (Array)
 import Dict exposing (Dict)
 import String
 import Html exposing (..)
-import Html.Attributes exposing (placeholder, href)
 import Html.Events exposing (onInput, onClick)
 import RemoteData exposing (WebData)
 import Http
@@ -81,23 +80,28 @@ type Msg
 -- ROUTING
 
 
-tabs : List ( String, String )
+tabs : List ( String, String, Bool -> Vocab -> Html Msg )
 tabs =
-    [ ( "Contains", "contains" )
-    , ( "Family", "family" )
-    , ( "Synonyms", "synonyms" )
-    , ( "Antonyms", "antonyms" )
+    [ ( "Contains", "contains", containView )
+    , ( "Family", "family", familyView )
+    , ( "Synonyms", "synonyms", synonymsView )
+    , ( "Antonyms", "antonyms", antonymsView )
     ]
 
 
 tabUrls : Array String
 tabUrls =
-    List.map (\( _, x ) -> x) tabs |> Array.fromList
+    List.map (\( _, x, _ ) -> x) tabs |> Array.fromList
+
+
+tabViews : Array (Bool -> Vocab -> Html Msg)
+tabViews =
+    List.map (\( _, _, v ) -> v) tabs |> Array.fromList
 
 
 urlTabs : Dict String Int
 urlTabs =
-    List.indexedMap (\idx ( _, x ) -> ( x, idx )) tabs |> Dict.fromList
+    List.indexedMap (\idx ( _, x, _ ) -> ( x, idx )) tabs |> Dict.fromList
 
 
 urlOf : Model -> String
@@ -219,7 +223,7 @@ maybeResult model response =
 
         RemoteData.Success vocab ->
             --vocabHtml model.route model.wordfindDef vocab
-            text "Loaded"
+            (Array.get model.selectedTab tabViews |> Maybe.withDefault e404) model.wordfindDef vocab
 
         RemoteData.Failure error ->
             text (toString error)
@@ -263,6 +267,12 @@ antonymsView showDef vocab =
             |> List.map (wordDataRow False)
             |> vocabTable
         ]
+
+
+e404 : Bool -> Vocab -> Html Msg
+e404 showDef vocab =
+    div []
+        [ text "route not found" ]
 
 
 countHeader : List a -> String -> Html Msg

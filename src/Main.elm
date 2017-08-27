@@ -4,7 +4,6 @@ import Array exposing (Array)
 import Dict exposing (Dict)
 import String
 import Html exposing (..)
-import Html.Events exposing (onInput, onClick)
 import RemoteData exposing (WebData)
 import Http
 import Json.Decode as Decode
@@ -14,13 +13,31 @@ import Material.Scheme
 import Material.Button as Button
 import Material.Textfield as Textfield
 import Material.Tabs as Tabs
+import Material.List as Lists
+import Material.Icon as Icon
+import Material.Color as Color
 import Material.Options as Options exposing (css)
+import Material.Options exposing (Property)
 import Navigation
 import RouteUrl as Routing
 
 
 --see https://github.com/debois/elm-mdl/blob/master/demo/Demo.elm
 --see https://github.com/debois/elm-mdl/blob/master/demo/Demo/Tabs.elm
+-- CONSTANTS
+
+
+colorSelected : Property c m
+colorSelected =
+    Color.background (Color.color Color.Blue Color.A700)
+
+
+colorNotSelected : Property c m
+colorNotSelected =
+    Color.background (Color.color Color.Grey Color.A700)
+
+
+
 -- MODEL
 
 
@@ -37,6 +54,25 @@ type alias Vocab =
     , synonyms : List WordData
     , antonyms : List WordData
     }
+
+
+vocabField : Vocab -> String -> List WordData
+vocabField vocab key =
+    case key of
+        "wordfind" ->
+            vocab.wordfind
+
+        "cambridge" ->
+            vocab.cambridge
+
+        "synonyms" ->
+            vocab.synonyms
+
+        "antonyms" ->
+            vocab.antonyms
+
+        _ ->
+            []
 
 
 type alias Model =
@@ -60,6 +96,15 @@ init =
     )
 
 
+tabs : List ( String, String, Model -> Vocab -> Html Msg )
+tabs =
+    [ ( "Contains", "contains", vocabView "wordfind" )
+    , ( "Family", "family", vocabView "cambridge" )
+    , ( "Synonyms", "synonyms", vocabView "synonyms" )
+    , ( "Antonyms", "antonyms", vocabView "antonyms" )
+    ]
+
+
 
 -- MESSAGES
 
@@ -80,21 +125,12 @@ type Msg
 -- ROUTING
 
 
-tabs : List ( String, String, Bool -> Vocab -> Html Msg )
-tabs =
-    [ ( "Contains", "contains", containView )
-    , ( "Family", "family", familyView )
-    , ( "Synonyms", "synonyms", synonymsView )
-    , ( "Antonyms", "antonyms", antonymsView )
-    ]
-
-
 tabUrls : Array String
 tabUrls =
     List.map (\( _, x, _ ) -> x) tabs |> Array.fromList
 
 
-tabViews : Array (Bool -> Vocab -> Html Msg)
+tabViews : Array (Model -> Vocab -> Html Msg)
 tabViews =
     List.map (\( _, _, v ) -> v) tabs |> Array.fromList
 
@@ -135,8 +171,11 @@ location2messages location =
 
 
 -- VIEW
---highlightNav : Route -> Model -> string
---highlightNav route model =
+
+
+tabLabels : List (Tabs.Label Msg)
+tabLabels =
+    List.map (\( x, _, _ ) -> Tabs.label [] [ text x ]) tabs
 
 
 nav : Model -> Html Msg
@@ -148,29 +187,17 @@ nav model =
         , Tabs.onSelectTab SelectTab
         , Tabs.activeTab model.selectedTab
         ]
-        [ Tabs.label []
-            [ text "Contain" ]
-        , Tabs.label []
-            [ text "Family" ]
-        , Tabs.label []
-            [ text "Synonyms" ]
-        , Tabs.label []
-            [ text "Antonyms" ]
-        ]
-        [--Options.div
-         --    [ css "margin" "24px auto"
-         --    , css "align-items" "flex-start"
-         --    , Options.center
-         --    , css "overflow-y" "auto"
-         --    , css "height" "512px"
-         --    ]
-         --    [ case model.tab of
-         --        0 ->
-         --            aboutTab
-         --        _ ->
-         --            exampleTab
-         --    ]
-        ]
+        tabLabels
+        []
+
+
+buttonMdl : Model -> Int -> Msg -> String -> Html Msg
+buttonMdl model index cb display =
+    Button.render Mdl
+        [ index ]
+        model.mdl
+        [ Options.onClick cb ]
+        [ text display ]
 
 
 
@@ -193,19 +220,8 @@ view model =
             ]
           )
             "JUST A PATCH HERE"
-        , Button.render Mdl
-            [ 1 ]
-            model.mdl
-            [ Options.onClick Curl
-
-            --, css "margin" "0 24px"
-            ]
-            [ text "Look!" ]
-        , Button.render Mdl
-            [ 2 ]
-            model.mdl
-            [ Options.onClick ToggleDef ]
-            [ text "Definition" ]
+        , buttonMdl model 1 Curl "Look!"
+        , buttonMdl model 2 ToggleDef "Definition"
         , nav model
         , div [] [ maybeResult model model.result ]
         ]
@@ -223,117 +239,60 @@ maybeResult model response =
 
         RemoteData.Success vocab ->
             --vocabHtml model.route model.wordfindDef vocab
-            (Array.get model.selectedTab tabViews |> Maybe.withDefault e404) model.wordfindDef vocab
+            (Array.get model.selectedTab tabViews |> Maybe.withDefault e404) model vocab
 
         RemoteData.Failure error ->
             text (toString error)
 
 
-containView : Bool -> Vocab -> Html Msg
-containView showDef vocab =
-    div []
-        [ countHeader vocab.wordfind "wordfind"
-        , vocab.wordfind
-            |> List.map (wordDataRow showDef)
-            |> vocabTable
-        ]
-
-
-familyView : Bool -> Vocab -> Html Msg
-familyView showDef vocab =
-    div []
-        [ countHeader vocab.cambridge "cambridge"
-        , vocab.cambridge
-            |> List.map (wordDataRow showDef)
-            |> vocabTable
-        ]
-
-
-synonymsView : Bool -> Vocab -> Html Msg
-synonymsView showDef vocab =
-    div []
-        [ countHeader vocab.synonyms "synonyms"
-        , vocab.synonyms
-            |> List.map (wordDataRow False)
-            |> vocabTable
-        ]
-
-
-antonymsView : Bool -> Vocab -> Html Msg
-antonymsView showDef vocab =
-    div []
-        [ countHeader vocab.antonyms "antonyms"
-        , vocab.antonyms
-            |> List.map (wordDataRow False)
-            |> vocabTable
-        ]
-
-
-e404 : Bool -> Vocab -> Html Msg
-e404 showDef vocab =
+e404 : x -> Vocab -> Html Msg
+e404 _ vocab =
     div []
         [ text "route not found" ]
 
 
-countHeader : List a -> String -> Html Msg
-countHeader theList src =
-    h5 []
-        [ theList
-            |> List.length
-            |> toString
-            |> (++) ("Found " ++ src ++ " ")
-            |> text
-        ]
-
-
-
---NotFoundRoute ->
---    [ text "Route not found"
---    ]
-
-
-vocabTable : List (Html Msg) -> Html Msg
-vocabTable rows =
-    table []
-        [ thead []
-            [ tr []
-                [ th []
-                    [ text "Ignore", button [ onClick DiselectAll ] [ text "Diselect all" ] ]
-                , th []
-                    [ text "Save", button [ onClick SelectAll ] [ text "Select all" ] ]
-                ]
+vocabView : String -> Model -> Vocab -> Html Msg
+vocabView field model vocab =
+    div []
+        [ h5 []
+            [ vocabField vocab field
+                |> List.length
+                |> toString
+                |> (++) ("Found " ++ field ++ " ")
+                |> text
             ]
-        , tbody []
-            rows
+        , buttonMdl model 0 DiselectAll "Diselect all"
+        , buttonMdl model 1 SelectAll "Select all"
+        , vocabField vocab field
+            |> List.map (wordDataItem model)
+            |> Lists.ul []
         ]
 
 
-wordDataRow : Bool -> WordData -> Html Msg
-wordDataRow showDef wordData =
-    let
-        ( show, hide ) =
-            ( td []
-                [ button [ onClick (ToggleSelect wordData.word) ] [ text ">" ]
-                , (if showDef then
-                    wordData.def
-                        |> List.map (\defItem -> wordDataDef defItem)
-                        |> toString
-                        |> (++) wordData.word
-                        |> text
-                   else
-                    text wordData.word
-                  )
+wordDataItem : Model -> WordData -> Html Msg
+wordDataItem model wordData =
+    Lists.li []
+        [ Lists.content []
+            [ Button.render Mdl
+                [ 0 ]
+                model.mdl
+                [ Button.icon
+                , Button.colored
+                , (Color.text Color.white)
+                , (?:) wordData.selected colorSelected colorNotSelected
+                , Options.onClick (ToggleSelect wordData.word)
                 ]
-            , td []
-                [ text "" ]
-            )
-    in
-        case wordData.selected of
-            True ->
-                tr [] [ hide, show ]
-
-            False ->
-                tr [] [ show, hide ]
+                [ (?:) wordData.selected (Icon.i "check box") (Icon.i "beach access") ]
+            , (?:) model.wordfindDef
+                (wordData.def
+                    |> List.map (\defItem -> wordDataDef defItem)
+                    |> toString
+                    |> (++) wordData.word
+                    |> text
+                )
+                (text wordData.word)
+            ]
+        ]
 
 
 wordDataDef : Maybe String -> String
@@ -358,6 +317,16 @@ flip b =
 
         False ->
             True
+
+
+(?:) : Bool -> x -> x -> x
+(?:) condition a b =
+    case condition of
+        True ->
+            a
+
+        _ ->
+            b
 
 
 selectWordData : Vocab -> String -> Vocab
@@ -407,6 +376,21 @@ remoteDataUpdate model apply =
         ( { model | result = webdata }, cmd )
 
 
+sortWordFind : Vocab -> Vocab
+sortWordFind vocab =
+    { vocab | wordfind = (List.sortBy (\vocabT -> vocabT.word) vocab.wordfind) }
+
+
+formatResponse : WebData Vocab -> WebData Vocab
+formatResponse response =
+    case response of
+        RemoteData.Success _ ->
+            RemoteData.map sortWordFind response
+
+        _ ->
+            response
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -429,7 +413,7 @@ update msg model =
             remoteDataUpdate model (\vocab -> setSelect vocab False)
 
         OnResponse response ->
-            ( { model | result = response }, Cmd.none )
+            ( { model | result = formatResponse <| response }, Cmd.none )
 
         Mdl msg_ ->
             Material.update Mdl msg_ model

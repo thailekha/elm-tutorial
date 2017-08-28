@@ -17,6 +17,8 @@ import Material.Tabs as Tabs
 import Material.List as Lists
 import Material.Icon as Icon
 import Material.Color as Color
+import Material.Helpers exposing (map1st, map2nd, delay, pure, cssTransitionStep)
+import Material.Snackbar as Snackbar
 import Material.Options as Options exposing (css)
 import Material.Options exposing (Property)
 import Navigation
@@ -82,6 +84,8 @@ type alias Model =
     , result : WebData Vocab
     , mdl : Material.Model
     , selectedTab : Int
+    , count : Int
+    , snackbar : Snackbar.Model Int
     }
 
 
@@ -92,6 +96,8 @@ init =
       , result = RemoteData.NotAsked
       , mdl = Material.model
       , selectedTab = 1
+      , count = 0
+      , snackbar = Snackbar.model
       }
     , Cmd.none
     )
@@ -170,6 +176,8 @@ type Msg
     | SaveResponse (WebData String)
     | Mdl (Material.Msg Msg)
     | SelectTab Int
+      --| AddSnackbar
+    | Snackbar (Snackbar.Msg Int)
 
 
 
@@ -247,6 +255,7 @@ buttonMdl model index cb display =
     Button.render Mdl
         [ index ]
         model.mdl
+        -- onClick cannot be used multiple times
         [ Options.onClick cb ]
         [ text display ]
 
@@ -275,7 +284,10 @@ view model =
         , buttonMdl model 2 ToggleDef "Definition"
         , buttonMdl model 2 ReqSave "Save"
         , nav model
-        , div [] [ maybeResult model model.result ]
+        , div []
+            [ maybeResult model model.result
+            , Snackbar.view model.snackbar |> Html.map Snackbar
+            ]
         ]
         |> Material.Scheme.top
 
@@ -443,6 +455,24 @@ formatResponse response =
             response
 
 
+addSnackbar : (Int -> Snackbar.Contents Int) -> Model -> ( Model, Cmd Msg )
+addSnackbar f model =
+    let
+        ( snackbar_, effect ) =
+            Snackbar.add (f model.count) model.snackbar
+                |> map2nd (Cmd.map Snackbar)
+
+        model_ =
+            { model
+                | snackbar = snackbar_
+            }
+    in
+        ( model_
+        , Cmd.batch
+            [ effect ]
+        )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -465,7 +495,8 @@ update msg model =
             remoteDataUpdate model (\vocab -> setSelect vocab False)
 
         OnResponse response ->
-            ( { model | result = formatResponse <| response }, Cmd.none )
+            ({ model | result = formatResponse <| response })
+                |> addSnackbar (\k -> Snackbar.snackbar k ("Snackbar message #" ++ toString k) "UNDO")
 
         ReqSave ->
             ( model
@@ -481,11 +512,30 @@ update msg model =
         SaveResponse response ->
             ( model, Cmd.none )
 
-        Mdl msg_ ->
-            Material.update Mdl msg_ model
-
         SelectTab idx ->
             ( { model | selectedTab = idx }, Cmd.none )
+
+        -- not used atm
+        --AddSnackbar ->
+        --    addSnackbar (\k -> Snackbar.snackbar k ("Snackbar message #" ++ toString k) "UNDO") model
+        Snackbar (Snackbar.Begin k) ->
+            model |> pure
+
+        Snackbar (Snackbar.End k) ->
+            model |> pure
+
+        -- ignoring squares
+        --Snackbar (Snackbar.Click k) ->
+        --    ( model |> mapSquare k (always Disappearing)
+        --    , delay transitionLength (Gone k)
+        --    )
+        Snackbar msg_ ->
+            Snackbar.update msg_ model.snackbar
+                |> map1st (\s -> { model | snackbar = s })
+                |> map2nd (Cmd.map Snackbar)
+
+        Mdl msg_ ->
+            Material.update Mdl msg_ model
 
 
 

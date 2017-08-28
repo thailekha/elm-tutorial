@@ -1,5 +1,7 @@
 var jsonServer = require('json-server');
 var request = require('superagent');
+//.debug = true
+var bodyParser = require('body-parser');
 var async = require('async');
 var cheerio = require('cheerio');
 var _ = require('lodash');
@@ -18,6 +20,9 @@ var wordnikQueries = '/relatedWords?useCanonical=true&relationshipTypes='
 
 // Returns an Express server
 var server = jsonServer.create()
+
+server.use(bodyParser.json()); // support json encoded bodies
+server.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 
 // Set default middlewares (logger, static, cors and no-cache)
 server.use(jsonServer.defaults())
@@ -70,6 +75,11 @@ server.get('/lookupword', function(req, res) {
         // }
         res.json(results);
     });
+});
+
+server.post('/save', function(req,res) {
+    console.log("body ", req.body);
+    res.json({});
 });
 
 var router = jsonServer.router('db.json')

@@ -6,6 +6,7 @@ import String
 import Html exposing (..)
 import RemoteData exposing (WebData)
 import Http
+import Json.Encode as Encode
 import Json.Decode as Decode
 import Json.Decode.Pipeline exposing (decode, required, optional, hardcoded)
 import Material
@@ -106,6 +107,54 @@ tabs =
 
 
 
+-- ENCODERS, DECODERS
+--https://github.com/NoRedInk/elm-decode-pipeline
+
+
+vocabDecoder : Decode.Decoder Vocab
+vocabDecoder =
+    decode Vocab
+        |> required "wordfind" (Decode.list wordDataDecoder)
+        |> required "cambridge" (Decode.list wordDataDecoder)
+        |> required "synonyms" (Decode.list wordDataDecoder)
+        |> required "antonyms" (Decode.list wordDataDecoder)
+
+
+wordDataDecoder : Decode.Decoder WordData
+wordDataDecoder =
+    decode WordData
+        |> required "word" Decode.string
+        |> optional "def" (Decode.list (Decode.maybe Decode.string)) []
+        |> hardcoded False
+
+
+filterAndEncodeWordData : List WordData -> Encode.Value
+filterAndEncodeWordData wordData =
+    wordData
+        |> List.filter (\i -> i.selected)
+        |> List.map (\i -> encodeWordData i)
+        |> Encode.list
+
+
+encodeVocab : Vocab -> Encode.Value
+encodeVocab vocab =
+    Encode.object
+        [ ( "wordfind", filterAndEncodeWordData vocab.wordfind )
+        , ( "cambridge", filterAndEncodeWordData vocab.cambridge )
+        , ( "synonyms", filterAndEncodeWordData vocab.synonyms )
+        , ( "antonyms", filterAndEncodeWordData vocab.antonyms )
+        ]
+
+
+encodeWordData : WordData -> Encode.Value
+encodeWordData wordData =
+    Encode.object
+        [ ( "word", Encode.string wordData.word )
+        , ( "def", List.map (\i -> i |> wordDataDef |> Encode.string) wordData.def |> Encode.list )
+        ]
+
+
+
 -- MESSAGES
 
 
@@ -117,6 +166,8 @@ type Msg
     | SelectAll
     | DiselectAll
     | OnResponse (WebData Vocab)
+    | ReqSave
+    | SaveResponse (WebData String)
     | Mdl (Material.Msg Msg)
     | SelectTab Int
 
@@ -222,6 +273,7 @@ view model =
             "JUST A PATCH HERE"
         , buttonMdl model 1 Curl "Look!"
         , buttonMdl model 2 ToggleDef "Definition"
+        , buttonMdl model 2 ReqSave "Save"
         , nav model
         , div [] [ maybeResult model model.result ]
         ]
@@ -298,11 +350,11 @@ wordDataItem model wordData =
 wordDataDef : Maybe String -> String
 wordDataDef def =
     case def of
-        Nothing ->
-            "error"
-
         Just defStr ->
             defStr
+
+        _ ->
+            "No definition"
 
 
 
@@ -415,6 +467,20 @@ update msg model =
         OnResponse response ->
             ( { model | result = formatResponse <| response }, Cmd.none )
 
+        ReqSave ->
+            ( model
+            , (case model.result of
+                RemoteData.Success vocab ->
+                    save vocab
+
+                _ ->
+                    Cmd.none
+              )
+            )
+
+        SaveResponse response ->
+            ( model, Cmd.none )
+
         Mdl msg_ ->
             Material.update Mdl msg_ model
 
@@ -433,25 +499,11 @@ curl query =
         |> Cmd.map OnResponse
 
 
-
---https://github.com/NoRedInk/elm-decode-pipeline
-
-
-vocabDecoder : Decode.Decoder Vocab
-vocabDecoder =
-    decode Vocab
-        |> required "wordfind" (Decode.list wordDataDecoder)
-        |> required "cambridge" (Decode.list wordDataDecoder)
-        |> required "synonyms" (Decode.list wordDataDecoder)
-        |> required "antonyms" (Decode.list wordDataDecoder)
-
-
-wordDataDecoder : Decode.Decoder WordData
-wordDataDecoder =
-    decode WordData
-        |> required "word" Decode.string
-        |> optional "def" (Decode.list (Decode.maybe Decode.string)) []
-        |> hardcoded False
+save : Vocab -> Cmd Msg
+save vocab =
+    Http.post "http://localhost:4000/save" (Http.jsonBody (encodeVocab vocab)) Decode.string
+        |> RemoteData.sendRequest
+        |> Cmd.map SaveResponse
 
 
 

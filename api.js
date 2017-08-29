@@ -77,9 +77,45 @@ server.get('/lookupword', function(req, res) {
     });
 });
 
+function printWordData(wordData, def) {
+    var res = wordData.word + '\n' ;
+    if(def) {
+        wordData.def.forEach(function(d) {
+            res += d + '\n';
+        })
+    }
+    console.log(res);
+    return  res;
+        
+}
+
+function add(a, b, noNewline) {
+    var res = a + b;
+    if(!noNewline) {
+        res += '\n';
+    }
+    return res;
+}
+
 server.post('/save', function(req,res) {
     console.log("body ", req.body);
-    res.json({});
+    var text = '//================\n' + req.body.query + '\n//================\n';
+    [["wordfind", "Có trong"], ["cambridge", "Từ loại"], ["synonyms", "Đồng nghĩa"], ["antonyms", "Trái nghĩa"]]
+        .forEach(function(key) {
+            text = add(text, 'o~~~~~ ' + key[1] + ' ~~~~~o');
+            req.body[key[0]].forEach(function(wordData) {
+                text = add(
+                    text, 
+                    printWordData(wordData, key[0] === "wordfind" || key[0] === "cambridge" ),
+                    key[0] === "synonyms" || key[0] === "antonyms"
+                );
+            }.bind(this));
+        })
+    fs.writeFile("save.txt", text, (err) => {
+        if (err) throw err;
+        console.log('The file has been saved!');
+        res.json({});
+    });
 });
 
 var router = jsonServer.router('db.json')

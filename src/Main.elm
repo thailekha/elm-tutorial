@@ -52,7 +52,8 @@ type alias WordData =
 
 
 type alias Vocab =
-    { wordfind : List WordData
+    { query : String
+    , wordfind : List WordData
     , cambridge : List WordData
     , synonyms : List WordData
     , antonyms : List WordData
@@ -115,9 +116,10 @@ tabs =
 --https://github.com/NoRedInk/elm-decode-pipeline
 
 
-vocabDecoder : Decode.Decoder Vocab
-vocabDecoder =
+vocabDecoder : String -> Decode.Decoder Vocab
+vocabDecoder query =
     decode Vocab
+        |> hardcoded query --query
         |> required "wordfind" (Decode.list wordDataDecoder)
         |> required "cambridge" (Decode.list wordDataDecoder)
         |> required "synonyms" (Decode.list wordDataDecoder)
@@ -143,7 +145,8 @@ filterAndEncodeWordData wordData =
 encodeVocab : Vocab -> Encode.Value
 encodeVocab vocab =
     Encode.object
-        [ ( "wordfind", filterAndEncodeWordData vocab.wordfind )
+        [ ( "query", Encode.string vocab.query )
+        , ( "wordfind", filterAndEncodeWordData vocab.wordfind )
         , ( "cambridge", filterAndEncodeWordData vocab.cambridge )
         , ( "synonyms", filterAndEncodeWordData vocab.synonyms )
         , ( "antonyms", filterAndEncodeWordData vocab.antonyms )
@@ -535,7 +538,7 @@ update msg model =
 
 curl : String -> Cmd Msg
 curl query =
-    Http.get ("http://localhost:4000/lookupword?w=" ++ query) vocabDecoder
+    Http.get ("http://localhost:4000/lookupword?w=" ++ query) (vocabDecoder query)
         |> RemoteData.sendRequest
         |> Cmd.map OnResponse
 

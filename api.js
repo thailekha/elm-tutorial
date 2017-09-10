@@ -1,4 +1,4 @@
-var jsonServer = require('json-server');
+var express = require('express');
 var request = require('superagent');
 //.debug = true
 var bodyParser = require('body-parser');
@@ -6,9 +6,11 @@ var async = require('async');
 var cheerio = require('cheerio');
 var _ = require('lodash');
 var fs = require('fs');
+var express = require('express');
+var path = require('path');
 require('dotenv').config();
 
-var path = process.cwd() + "/dict.txt";
+var dictPath = process.cwd() + "/dict.txt";
 var words = {};
 var wordnikAuthUrl = 'http://api.wordnik.com/v4/account.json/authenticate/';
 var wordnikToken = '';
@@ -16,16 +18,16 @@ var wordnikToken = '';
 var wordfindUrl = 'http://www.wordfind.com/contains/';
 var cambridgeUrl = 'http://dictionary.cambridge.org/search/english-vietnamese/direct/?q=';
 var wordnikUrl = 'https://api.wordnik.com/v4/word.json/';
-var wordnikQueries = '/relatedWords?useCanonical=true&relationshipTypes='
+var wordnikQueries = '/relatedWords?useCanonical=true&relationshipTypes=';
 
-// Returns an Express server
-var server = jsonServer.create()
+var server = express();
 
 server.use(bodyParser.json()); // support json encoded bodies
 server.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 
-// Set default middlewares (logger, static, cors and no-cache)
-server.use(jsonServer.defaults())
+//TODO: Set default middlewares (logger, static, cors and no-cache)
+
+server.use('/static',express.static(path.join(__dirname, 'build')));
 
 server.get('/lookupword', function(req, res) {
     async.parallel({
@@ -118,9 +120,6 @@ server.post('/save', function(req,res) {
     });
 });
 
-var router = jsonServer.router('db.json')
-server.use(router);
-
 function processData(data, words) {
     data
         .split('\n@')
@@ -191,4 +190,10 @@ function reqCheerio(url, cheerioQuery, toMap, cb) {
     });
 }
 
-initServer(server, path, words, wordnikAuthUrl, process.env.USERNAME, process.env.PASSWORD, process.env.API_KEY, wordnikToken);
+initServer(server, dictPath, words, wordnikAuthUrl, process.env.USERNAME, process.env.PASSWORD, process.env.API_KEY, wordnikToken);
+
+server._router.stack.forEach(function(r){
+  if (r.route && r.route.path){
+    console.log(r.route.path)
+  }
+})

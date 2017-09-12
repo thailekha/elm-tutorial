@@ -2,7 +2,9 @@
  * This config creates a Webpack dev server, see the key devServer. We will be using this server for development instead of Elm reactor 
 */
 
+require('dotenv').config();
 var path = require("path");
+var webpack = require('webpack');
 
 module.exports = {
   entry: {
@@ -53,5 +55,8 @@ module.exports = {
     stats: { colors: true },
   },
 
+  plugins: [
+    new webpack.EnvironmentPlugin(["HOST", "PORT", "HEROK_PORT"])
+  ]
 
 };

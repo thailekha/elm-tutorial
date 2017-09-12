@@ -22,12 +22,14 @@ var wordnikQueries = '/relatedWords?useCanonical=true&relationshipTypes=';
 
 var server = express();
 
+server.set('port', (process.env.PORT || 5000));
+
 server.use(bodyParser.json()); // support json encoded bodies
 server.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 
 //TODO: Set default middlewares (logger, static, cors and no-cache)
 
-server.use('/static',express.static(path.join(__dirname, 'build')));
+server.use('/static',express.static(path.join(__dirname, 'dist')));
 
 server.get('/lookupword', function(req, res) {
     async.parallel({
@@ -155,8 +157,9 @@ function initServer(server, dictionaryPath, words, wordnikAuthUrl, username, pas
             if (err) throw err;
             wordnikToken = res.body;
 
-            console.log('Server initialized, Listening at 4000');
-            server.listen(4000);
+            server.listen(server.get('port'), function() {
+              console.log('Node app is running at', server.get('port'));
+            });
         });
 }
 

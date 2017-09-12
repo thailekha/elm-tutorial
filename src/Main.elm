@@ -79,6 +79,11 @@ vocabField vocab key =
             []
 
 
+type alias Flags =
+    { envVar1 : String
+    }
+
+
 type alias Model =
     { content : String
     , wordfindDef : Bool
@@ -86,17 +91,19 @@ type alias Model =
     , mdl : Material.Model
     , selectedTab : Int
     , snackbar : Snackbar.Model String
+    , backendUrl : String
     }
 
 
-init : ( Model, Cmd Msg )
-init =
+init : Flags -> ( Model, Cmd Msg )
+init flags =
     ( { content = ""
       , wordfindDef = True
       , result = RemoteData.NotAsked
       , mdl = Material.model
       , selectedTab = 1
       , snackbar = Snackbar.model
+      , backendUrl = flags.envVar1
       }
     , Cmd.none
     )
@@ -119,7 +126,8 @@ tabs =
 vocabDecoder : String -> Decode.Decoder Vocab
 vocabDecoder query =
     decode Vocab
-        |> hardcoded query --query
+        |> hardcoded query
+        --query
         |> required "wordfind" (Decode.list wordDataDecoder)
         |> required "cambridge" (Decode.list wordDataDecoder)
         |> required "synonyms" (Decode.list wordDataDecoder)
@@ -475,7 +483,7 @@ update msg model =
             { model | result = RemoteData.Loading }
                 |> addSnackbar "Fetch" "Fetching" "Server"
                 |> map2nd List.singleton
-                |> map2nd ((::) (curl model.content))
+                |> map2nd ((::) (curl model model.content))
                 |> map2nd Cmd.batch
 
         --let
@@ -504,7 +512,7 @@ update msg model =
             ( model
             , (case model.result of
                 RemoteData.Success vocab ->
-                    save vocab
+                    save model vocab
 
                 _ ->
                     Cmd.none
@@ -536,16 +544,16 @@ update msg model =
 -- COMMANDS
 
 
-curl : String -> Cmd Msg
-curl query =
-    Http.get ("http://localhost:4000/lookupword?w=" ++ query) (vocabDecoder query)
+curl : Model -> String -> Cmd Msg
+curl model query =
+    Http.get (model.backendUrl ++ "/lookupword?w=" ++ query) (vocabDecoder query)
         |> RemoteData.sendRequest
         |> Cmd.map OnResponse
 
 
-save : Vocab -> Cmd Msg
-save vocab =
-    Http.post "http://localhost:4000/save" (Http.jsonBody (encodeVocab vocab)) Decode.string
+save : Model -> Vocab -> Cmd Msg
+save model vocab =
+    Http.post (model.backendUrl ++ "/save") (Http.jsonBody (encodeVocab vocab)) Decode.string
         |> RemoteData.sendRequest
         |> Cmd.map SaveResponse
 
@@ -563,9 +571,9 @@ subscriptions model =
 -- MAIN
 
 
-main : Routing.RouteUrlProgram Never Model Msg
+main : Routing.RouteUrlProgram Flags Model Msg
 main =
-    Routing.program
+    Routing.programWithFlags
         { delta2url = delta2url
         , location2messages = location2messages
         , init = init

@@ -2,5 +2,5 @@ elm-stuff/*
 build/*
 node_modules/*
 dist/*
-scripts/heroku-envvars.sh
+heroku-envvars.sh
 .env

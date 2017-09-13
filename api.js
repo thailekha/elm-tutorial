@@ -10,7 +10,7 @@ var express = require('express');
 var path = require('path');
 require('dotenv').config();
 
-var dictPath = process.cwd() + "/dict.txt";
+var dictPath = process.cwd() + "/assets/dict.txt";
 var words = {};
 var wordnikAuthUrl = 'http://api.wordnik.com/v4/account.json/authenticate/';
 var wordnikToken = '';

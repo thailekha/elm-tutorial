@@ -1,4 +1,4 @@
-module Main exposing (..)
+port module Main exposing (..)
 
 import Array exposing (Array)
 import Dict exposing (Dict)
@@ -79,6 +79,16 @@ vocabField vocab key =
             []
 
 
+emptyVocab : Vocab
+emptyVocab =
+    { query = ""
+    , wordfind = []
+    , cambridge = []
+    , synonyms = []
+    , antonyms = []
+    }
+
+
 type alias Flags =
     { envVar1 : String
     }
@@ -93,6 +103,21 @@ type alias Model =
     , snackbar : Snackbar.Model String
     , backendUrl : String
     }
+
+
+
+--init : ( Model, Cmd Msg )
+--init =
+--    ( { content = ""
+--      , wordfindDef = True
+--      , result = RemoteData.NotAsked
+--      , mdl = Material.model
+--      , selectedTab = 1
+--      , snackbar = Snackbar.model
+--      , backendUrl = "http://0.0.0.0:5000"
+--      }
+--    , Cmd.none
+--    )
 
 
 init : Flags -> ( Model, Cmd Msg )
@@ -115,7 +140,18 @@ tabs =
     , ( "Family", "family", vocabView "cambridge" )
     , ( "Synonyms", "synonyms", vocabView "synonyms" )
     , ( "Antonyms", "antonyms", vocabView "antonyms" )
+    , ( "Mindmap", "mindmap", mindmapView "patch" )
     ]
+
+
+maybeVocab : Model -> Vocab
+maybeVocab model =
+    case model.result of
+        RemoteData.Success vocab ->
+            vocab
+
+        _ ->
+            emptyVocab
 
 
 
@@ -342,6 +378,11 @@ vocabView field model vocab =
         ]
 
 
+mindmapView : String -> Model -> Vocab -> Html Msg
+mindmapView patch model vocab =
+    div [] []
+
+
 wordDataItem : Model -> WordData -> Html Msg
 wordDataItem model wordData =
     Lists.li []
@@ -473,6 +514,14 @@ addSnackbar payload message label model =
         ( { model | snackbar = snackbar_ }, Cmd.map Snackbar effect )
 
 
+addCmd : Cmd Msg -> ( x, Cmd Msg ) -> ( x, Cmd Msg )
+addCmd effect tuple =
+    tuple
+        |> map2nd List.singleton
+        |> map2nd ((::) effect)
+        |> map2nd Cmd.batch
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -482,9 +531,7 @@ update msg model =
         Curl ->
             { model | result = RemoteData.Loading }
                 |> addSnackbar "Fetch" "Fetching" "Server"
-                |> map2nd List.singleton
-                |> map2nd ((::) (curl model model.content))
-                |> map2nd Cmd.batch
+                |> addCmd (curl model model.content)
 
         --let
         --    ( model_, snackBarEffect ) =
@@ -505,8 +552,13 @@ update msg model =
             remoteDataUpdate model (\vocab -> setSelect vocab False)
 
         OnResponse response ->
-            ({ model | result = formatResponse <| response })
-                |> addSnackbar "Fetch" "Done fetching" "Server"
+            let
+                updatedModel =
+                    ({ model | result = formatResponse <| response })
+            in
+                updatedModel
+                    |> addSnackbar "Fetch" "Done fetching" "Server"
+                    |> addCmd (maybeVocab updatedModel |> dataForMindmap)
 
         ReqSave ->
             ( model
@@ -523,7 +575,7 @@ update msg model =
             addSnackbar "Save" "Saved" "Server" model
 
         SelectTab idx ->
-            ( { model | selectedTab = idx }, Cmd.none )
+            ( { model | selectedTab = idx }, (?:) (idx == 4) (maybeVocab model |> dataForMindmap) (removeMindmap "Hi, remove mindmap please :)") )
 
         Snackbar (Snackbar.Begin k) ->
             model |> pure
@@ -558,6 +610,12 @@ save model vocab =
         |> Cmd.map SaveResponse
 
 
+port dataForMindmap : Vocab -> Cmd msg
+
+
+port removeMindmap : String -> Cmd msg
+
+
 
 -- SUBSCRIPTIONS
 
@@ -581,3 +639,16 @@ main =
         , subscriptions = subscriptions
         , update = update
         }
+
+
+
+--main : Routing.RouteUrlProgram Never Model Msg
+--main =
+--    Routing.program
+--        { delta2url = delta2url
+--        , location2messages = location2messages
+--        , init = init
+--        , view = view
+--        , subscriptions = subscriptions
+--        , update = update
+--        }

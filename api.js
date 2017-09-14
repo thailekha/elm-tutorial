@@ -29,9 +29,9 @@ server.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 
 //TODO: Set default middlewares (logger, static, cors and no-cache)
 
-server.use('/static',express.static(path.join(__dirname, 'dist')));
+server.use('/',express.static(path.join(__dirname, 'dist')));
 
-server.get('/lookupword', function(req, res) {
+server.get('/api/lookupword', function(req, res) {
     async.parallel({
         wordfind(cb) {
             reqCheerio(wordfindUrl + req.query.w, 'li.defLink',
@@ -101,7 +101,7 @@ function add(a, b, noNewline) {
     return res;
 }
 
-server.post('/save', function(req,res) {
+server.post('/api/save', function(req,res) {
     console.log("body ", req.body);
     var text = '//================\n' + req.body.query + '\n//================\n';
     [["wordfind", "Có trong"], ["cambridge", "Từ loại"], ["synonyms", "Đồng nghĩa"], ["antonyms", "Trái nghĩa"]]
@@ -115,10 +115,18 @@ server.post('/save', function(req,res) {
                 );
             }.bind(this));
         })
-    fs.writeFile("save.txt", text, (err) => {
+    fs.writeFile("./dump/save.txt", text, (err) => {
         if (err) throw err;
         console.log('The file has been saved!');
         res.json({});
+    });
+});
+
+server.get('/download', function(req,res) {
+    res.download("./dump/save.txt", function(errDownload) {
+        if(errDownload) {
+            console.log(errDownload);
+        }
     });
 });
 
@@ -148,7 +156,7 @@ function processData(data, words) {
         });
 }
 
-function initServer(server, dictionaryPath, words, wordnikAuthUrl, username, password, apikey, wordnikToken) {
+function initServerFull(server, dictionaryPath, words, wordnikAuthUrl, username, password, apikey, wordnikToken) {
     processData(fs.readFileSync(dictionaryPath, 'utf-8'), words);
     request
         .get(wordnikAuthUrl + username + '?password=' + password + '&api_key=' + apikey)
@@ -161,6 +169,12 @@ function initServer(server, dictionaryPath, words, wordnikAuthUrl, username, pas
               console.log('Node app is running at', server.get('port'));
             });
         });
+}
+
+function initServerTest(server) {
+    server.listen(server.get('port'), function() {
+      console.log('Node app is running at', server.get('port'));
+    });
 }
 
 function formatWordnikResponse(body) {
@@ -193,7 +207,8 @@ function reqCheerio(url, cheerioQuery, toMap, cb) {
     });
 }
 
-initServer(server, dictPath, words, wordnikAuthUrl, process.env.USERNAME, process.env.PASSWORD, process.env.API_KEY, wordnikToken);
+initServerFull(server, dictPath, words, wordnikAuthUrl, process.env.USERNAME, process.env.PASSWORD, process.env.API_KEY, wordnikToken);
+//initServerTest(server);
 
 server._router.stack.forEach(function(r){
   if (r.route && r.route.path){

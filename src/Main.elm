@@ -4,6 +4,7 @@ import Array exposing (Array)
 import Dict exposing (Dict)
 import String
 import Html exposing (..)
+import Html.Attributes exposing (href, target)
 import RemoteData exposing (WebData)
 import Http
 import Json.Encode as Encode
@@ -97,6 +98,7 @@ type alias Flags =
 type alias Model =
     { content : String
     , wordfindDef : Bool
+    , fileDownload : Bool
     , result : WebData Vocab
     , mdl : Material.Model
     , selectedTab : Int
@@ -124,6 +126,7 @@ init : Flags -> ( Model, Cmd Msg )
 init flags =
     ( { content = ""
       , wordfindDef = True
+      , fileDownload = False
       , result = RemoteData.NotAsked
       , mdl = Material.model
       , selectedTab = 1
@@ -141,6 +144,7 @@ tabs =
     , ( "Synonyms", "synonyms", vocabView "synonyms" )
     , ( "Antonyms", "antonyms", vocabView "antonyms" )
     , ( "Mindmap", "mindmap", mindmapView "patch" )
+    , ( "History", "History", mindmapView "patch" )
     ]
 
 
@@ -219,6 +223,7 @@ type Msg
     | OnResponse (WebData Vocab)
     | ReqSave
     | SaveResponse (WebData String)
+    | DisableFileDownload
     | Mdl (Material.Msg Msg)
     | SelectTab Int
       --| AddSnackbar
@@ -327,7 +332,17 @@ view model =
             "JUST A PATCH HERE"
         , buttonMdl model 1 Curl "Look!"
         , buttonMdl model 2 ToggleDef "Definition"
-        , buttonMdl model 2 ReqSave "Save"
+        , (?:) model.fileDownload
+            (Button.render Mdl
+                [ 0 ]
+                model.mdl
+                [ Button.link <| model.backendUrl ++ "/download"
+                , Options.attribute <| target "_blank"
+                , Options.onClick DisableFileDownload
+                ]
+                [ text "File ready - Download" ]
+            )
+            (buttonMdl model 2 ReqSave "Save")
         , nav model
         , div []
             [ maybeResult model model.result
@@ -572,7 +587,11 @@ update msg model =
             )
 
         SaveResponse response ->
-            addSnackbar "Save" "Saved" "Server" model
+            { model | fileDownload = True }
+                |> addSnackbar "Save" "Saved" "Server"
+
+        DisableFileDownload ->
+            ( { model | fileDownload = False }, Cmd.none )
 
         SelectTab idx ->
             ( { model | selectedTab = idx }, (?:) (idx == 4) (maybeVocab model |> dataForMindmap) (removeMindmap "Hi, remove mindmap please :)") )
@@ -598,14 +617,14 @@ update msg model =
 
 curl : Model -> String -> Cmd Msg
 curl model query =
-    Http.get (model.backendUrl ++ "/lookupword?w=" ++ query) (vocabDecoder query)
+    Http.get (model.backendUrl ++ "/api/lookupword?w=" ++ query) (vocabDecoder query)
         |> RemoteData.sendRequest
         |> Cmd.map OnResponse
 
 
 save : Model -> Vocab -> Cmd Msg
 save model vocab =
-    Http.post (model.backendUrl ++ "/save") (Http.jsonBody (encodeVocab vocab)) Decode.string
+    Http.post (model.backendUrl ++ "/api/save") (Http.jsonBody (encodeVocab vocab)) Decode.string
         |> RemoteData.sendRequest
         |> Cmd.map SaveResponse
 

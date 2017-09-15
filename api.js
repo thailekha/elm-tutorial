@@ -81,40 +81,30 @@ server.get('/api/lookupword', function(req, res) {
     });
 });
 
-function printWordData(wordData, def) {
-    var res = wordData.word + '\n' ;
-    if(def) {
-        wordData.def.forEach(function(d) {
-            res += d + '\n';
-        })
-    }
-    console.log(res);
-    return  res;
-        
-}
-
-function add(a, b, noNewline) {
-    var res = a + b;
-    if(!noNewline) {
-        res += '\n';
-    }
-    return res;
-}
-
 server.post('/api/save', function(req,res) {
-    console.log("body ", req.body);
+    //console.log("body ", req.body);
     var text = '//================\n' + req.body.query + '\n//================\n';
-    [["wordfind", "Có trong"], ["cambridge", "Từ loại"], ["synonyms", "Đồng nghĩa"], ["antonyms", "Trái nghĩa"]]
-        .forEach(function(key) {
-            text = add(text, 'o~~~~~ ' + key[1] + ' ~~~~~o');
-            req.body[key[0]].forEach(function(wordData) {
-                text = add(
-                    text, 
-                    printWordData(wordData, key[0] === "wordfind" || key[0] === "cambridge" ),
-                    key[0] === "synonyms" || key[0] === "antonyms"
-                );
-            }.bind(this));
-        })
+
+    text += 'o~~~~~ Có trong ~~~~~o\n';
+    text += req.body.wordfind.map(function(wordData) {
+        return wordData.word + '\n' + wordData.def.join('\n')
+    }).join('\n');
+
+    text += '\n\no~~~~~ Từ loại ~~~~~o\n';
+    text += req.body.cambridge.map(function(wordData) {
+        return wordData.word + '\n' + wordData.def.join('\n')
+    }).join('\n');
+
+    text += '\n\no~~~~~ Đồng nghĩa ~~~~~o\n';
+    text += req.body.synonyms.map(function(wordData) {
+        return wordData.word
+    }).join('\n');
+
+    text += '\n\no~~~~~ Trái nghĩa ~~~~~o\n';
+    text += req.body.antonyms.map(function(wordData) {
+        return wordData.word
+    }).join('\n');
+
     fs.writeFile("./dump/save.txt", text, (err) => {
         if (err) throw err;
         console.log('The file has been saved!');

@@ -1,7 +1,22 @@
 //================
-confident
+immutable
 //================
 o~~~~~ Có trong ~~~~~o
+Immutable
+i'mju:təbl
+*  tính từ
+- không thay đổi, không biến đổi; không thể thay đổi được, không thể biến đổi được
+
 o~~~~~ Từ loại ~~~~~o
+immutability
+i,mju:tə'biliti
+*  danh từ
+- tính không thay đổi, tính không biến đổi; tính không thể thay đổi được, tính không thể biến đổi được
+
 o~~~~~ Đồng nghĩa ~~~~~o
+unchangeable
+unalterable
+
 o~~~~~ Trái nghĩa ~~~~~o
+nonimmutable
+mutable

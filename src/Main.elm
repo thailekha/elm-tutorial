@@ -537,6 +537,16 @@ addCmd effect tuple =
         |> map2nd Cmd.batch
 
 
+
+--(?|>) : Bool -> x -> x -> x
+--(?|>) condition a b =
+--    case condition of
+--        True ->
+--            b |> a
+--        _ ->
+--            b
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -573,7 +583,11 @@ update msg model =
             in
                 updatedModel
                     |> addSnackbar "Fetch" "Done fetching" "Server"
-                    |> addCmd (maybeVocab updatedModel |> dataForMindmap)
+                    |> addCmd
+                        ((?:) (model.selectedTab == 4)
+                            (maybeVocab updatedModel |> dataForMindmap)
+                            Cmd.none
+                        )
 
         ReqSave ->
             ( model

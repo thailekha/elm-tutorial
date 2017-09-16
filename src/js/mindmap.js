@@ -56,7 +56,7 @@ function init(dataFromElm) {
         {
           alignment: go.Spot.Right,
           alignmentFocus: go.Spot.Left,
-          click: addNodeAndLink  // define click behavior for this Button in the Adornment
+          click: selectNode  // define click behavior for this Button in the Adornment
         },
         $(go.TextBlock, "+",  // the Button content
           { font: "bold 8pt sans-serif" })
@@ -66,15 +66,6 @@ function init(dataFromElm) {
   // and to perform a limited tree layout starting at that node
   myDiagram.nodeTemplate.contextMenu =
     $(go.Adornment, "Vertical",
-      $("ContextMenuButton",
-        $(go.TextBlock, "Bigger"),
-        { click: function(e, obj) { changeTextSize(obj, 1.1); } }),
-      $("ContextMenuButton",
-        $(go.TextBlock, "Smaller"),
-        { click: function(e, obj) { changeTextSize(obj, 1/1.1); } }),
-      $("ContextMenuButton",
-        $(go.TextBlock, "Bold/Normal"),
-        { click: function(e, obj) { toggleTextWeight(obj); } }),
       $("ContextMenuButton",
         $(go.TextBlock, "Layout"),
         {
@@ -145,28 +136,6 @@ function spotConverter(dir, from) {
     return (from ? go.Spot.Right : go.Spot.Left);
   }
 }
-function changeTextSize(obj, factor) {
-  var adorn = obj.part;
-  adorn.diagram.startTransaction("Change Text Size");
-  var node = adorn.adornedPart;
-  var tb = node.findObject("TEXT");
-  tb.scale *= factor;
-  adorn.diagram.commitTransaction("Change Text Size");
-}
-function toggleTextWeight(obj) {
-  var adorn = obj.part;
-  adorn.diagram.startTransaction("Change Text Weight");
-  var node = adorn.adornedPart;
-  var tb = node.findObject("TEXT");
-  // assume "bold" is at the start of the font specifier
-  var idx = tb.font.indexOf("bold");
-  if (idx < 0) {
-    tb.font = "bold " + tb.font;
-  } else {
-    tb.font = tb.font.substr(idx + 5);
-  }
-  adorn.diagram.commitTransaction("Change Text Weight");
-}
 function updateNodeDirection(node, dir) {
   myDiagram.model.setDataProperty(node.data, "dir", dir);
   // recursively update the direction of the child nodes
@@ -175,17 +144,14 @@ function updateNodeDirection(node, dir) {
     updateNodeDirection(chl.value, dir);
   }
 }
-function addNodeAndLink(e, obj) {
+function selectNode(e, obj) {
   var adorn = obj.part;
   var diagram = adorn.diagram;
-  diagram.startTransaction("Add Node");
-  var oldnode = adorn.adornedPart;
-  var olddata = oldnode.data;
-  // copy the brush and direction to the new node data
-  var newdata = { text: "idea", brush: olddata.brush, dir: olddata.dir, parent: olddata.key };
-  diagram.model.addNodeData(newdata);
-  layoutTree(oldnode);
-  diagram.commitTransaction("Add Node");
+  diagram.startTransaction("Select Node");
+  var node = adorn.adornedPart;
+  diagram.model.setDataProperty(node.data, "brush", "red");
+  layoutTree(node);
+  diagram.commitTransaction("Select Node");
 }
 function layoutTree(node) {
   if (node.data.key === 0) {  // adding to the root?

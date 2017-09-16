@@ -20,6 +20,7 @@ import Material.Icon as Icon
 import Material.Color as Color
 import Material.Helpers exposing (map1st, map2nd, delay, pure, cssTransitionStep)
 import Material.Snackbar as Snackbar
+import Material.Dialog as Dialog
 import Material.Options as Options exposing (css)
 import Material.Options exposing (Property)
 import Navigation
@@ -100,6 +101,7 @@ type alias Model =
     , wordfindDef : Bool
     , fileDownload : Bool
     , result : WebData Vocab
+    , history : List Vocab
     , mdl : Material.Model
     , selectedTab : Int
     , snackbar : Snackbar.Model String
@@ -128,6 +130,7 @@ init flags =
       , wordfindDef = True
       , fileDownload = False
       , result = RemoteData.NotAsked
+      , history = []
       , mdl = Material.model
       , selectedTab = 1
       , snackbar = Snackbar.model
@@ -137,6 +140,10 @@ init flags =
     )
 
 
+
+-- subtabs!
+
+
 tabs : List ( String, String, Model -> Vocab -> Html Msg )
 tabs =
     [ ( "Contains", "contains", vocabView "wordfind" )
@@ -144,7 +151,6 @@ tabs =
     , ( "Synonyms", "synonyms", vocabView "synonyms" )
     , ( "Antonyms", "antonyms", vocabView "antonyms" )
     , ( "Mindmap", "mindmap", mindmapView "patch" )
-    , ( "History", "History", mindmapView "patch" )
     ]
 
 
@@ -226,6 +232,7 @@ type Msg
     | DisableFileDownload
     | Mdl (Material.Msg Msg)
     | SelectTab Int
+    | SelectHistory Vocab
       --| AddSnackbar
     | Snackbar (Snackbar.Msg String)
 
@@ -334,7 +341,7 @@ view model =
         , buttonMdl model 2 ToggleDef "Definition"
         , (?:) model.fileDownload
             (Button.render Mdl
-                [ 0 ]
+                [ 3 ]
                 model.mdl
                 [ Button.link <| model.backendUrl ++ "/download"
                 , Options.attribute <| target "_blank"
@@ -343,6 +350,12 @@ view model =
                 [ text "File ready - Download" ]
             )
             (buttonMdl model 2 ReqSave "Save")
+        , Button.render Mdl
+            [ 4 ]
+            model.mdl
+            [ Dialog.openOn "click" ]
+            [ text "History" ]
+        , dialog model
         , nav model
         , div []
             [ maybeResult model model.result
@@ -350,6 +363,34 @@ view model =
             ]
         ]
         |> Material.Scheme.top
+
+
+dialog : Model -> Html Msg
+dialog model =
+    Dialog.view
+        []
+        [ Dialog.title [] [ text "History" ]
+        , Dialog.content []
+            (List.map
+                (\history ->
+                    Button.render Mdl
+                        [ 0 ]
+                        model.mdl
+                        [ Dialog.closeOn "click"
+                        , Options.onClick (SelectHistory history)
+                        ]
+                        [ text history.query ]
+                )
+                model.history
+            )
+        , Dialog.actions []
+            [ Button.render Mdl
+                [ 0 ]
+                model.mdl
+                [ Dialog.closeOn "click" ]
+                [ text "Close" ]
+            ]
+        ]
 
 
 maybeResult : Model -> WebData Vocab -> Html Msg
@@ -556,7 +597,7 @@ update msg model =
         Curl ->
             { model | result = RemoteData.Loading }
                 |> addSnackbar "Fetch" "Fetching" "Server"
-                |> addCmd (curl model model.content)
+                |> addCmd (curl model)
 
         --let
         --    ( model_, snackBarEffect ) =
@@ -578,8 +619,22 @@ update msg model =
 
         OnResponse response ->
             let
+                formatted =
+                    formatResponse response
+
                 updatedModel =
-                    ({ model | result = formatResponse <| response })
+                    ({ model
+                        | result = formatted
+                        , history =
+                            (case formatted of
+                                RemoteData.Success vocab ->
+                                    (::) vocab model.history
+
+                                _ ->
+                                    model.history
+                            )
+                     }
+                    )
             in
                 updatedModel
                     |> addSnackbar "Fetch" "Done fetching" "Server"
@@ -610,6 +665,18 @@ update msg model =
         SelectTab idx ->
             ( { model | selectedTab = idx }, (?:) (idx == 4) (maybeVocab model |> dataForMindmap) (removeMindmap "Hi, remove mindmap please :)") )
 
+        SelectHistory historyItem ->
+            let
+                updatedModel =
+                    { model | result = RemoteData.succeed historyItem }
+            in
+                ( updatedModel
+                , ((?:) (updatedModel.selectedTab == 4)
+                    (maybeVocab updatedModel |> dataForMindmap)
+                    Cmd.none
+                  )
+                )
+
         Snackbar (Snackbar.Begin k) ->
             model |> pure
 
@@ -629,9 +696,9 @@ update msg model =
 -- COMMANDS
 
 
-curl : Model -> String -> Cmd Msg
-curl model query =
-    Http.get (model.backendUrl ++ "/api/lookupword?w=" ++ query) (vocabDecoder query)
+curl : Model -> Cmd Msg
+curl model =
+    Http.get (model.backendUrl ++ "/api/lookupword?w=" ++ model.content) (vocabDecoder model.content)
         |> RemoteData.sendRequest
         |> Cmd.map OnResponse
 

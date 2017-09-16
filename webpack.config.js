@@ -56,7 +56,13 @@ module.exports = {
   },
 
   plugins: [
-    new webpack.EnvironmentPlugin(["HOST", "PORT", "HEROK_PORT"])
+    new webpack.EnvironmentPlugin(["HOST", "PORT", "HEROK_PORT"]),
+    // For lighter bundle
+    new webpack.optimize.UglifyJsPlugin({
+      compressor: {
+        warnings: false
+      }
+    })
   ]
 
 };

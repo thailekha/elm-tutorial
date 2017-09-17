@@ -41,7 +41,7 @@ var app = Elm.Main.embed(mountNode, {
 function createMindmapDiv() {
 	var node = document.createElement("div");
 	node.setAttribute("id", "myDiagramDiv");
-	node.setAttribute("style", "border: solid 1px black; width:100%; height:300px;");
+	node.setAttribute("style", "border: solid 1px black; width:100%; height:550px;");
 	return node;
 }
 
@@ -62,7 +62,7 @@ function getSampleModel() {
 app.ports.removeMindmap.subscribe(function(msg) {
 	var mindmapNode = document.getElementById("myDiagramDiv");
 	if(mindmapNode) {
-		document.getElementById('main').removeChild(mindmapNode);
+		document.getElementById('other').removeChild(mindmapNode);
 	}
 });
 
@@ -91,7 +91,7 @@ app.ports.dataForMindmap.subscribe(function(model) {
 		load(mindmapModel);
 	}
 	else {
-		document.getElementById('main').appendChild(createMindmapDiv());
+		document.getElementById('other').appendChild(createMindmapDiv());
 		init(mindmapModel);
 	}
 });

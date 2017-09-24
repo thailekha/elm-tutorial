@@ -1,0 +1,36 @@
+language: node_js
+
+node_js:
+  - "6.11.2"
+
+# quicker travis
+# https://github.com/Gizra/elm-spa-example/commit/dc0b543403f98c3255b293227fdfb97d4940cc17
+# https://github.com/elm-lang/elm-compiler/issues/1473
+# =========================
+cache:
+  directories:
+    - sysconfcpus
+#==========================
+
+before_install:
+  - npm i -g elm webpack
+
+install: 
+  - npm install
+  - elm-package install -y
+# quicker travis
+# =========================
+  - |
+    if [ ! -d sysconfcpus/bin ];
+    then
+      git clone https://github.com/obmarg/libsysconfcpus.git;
+      cd libsysconfcpus;
+      ./configure --prefix=$TRAVIS_BUILD_DIR/sysconfcpus;
+      make && make install;
+      cd ..;
+    fi
+#==========================
+
+before_script:
+# quicker travis
+  - $TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2 webpack

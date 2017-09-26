@@ -1,7 +1,18 @@
+dist: trusty
+sudo: required
+
 language: node_js
 
 node_js:
   - "6.11.2"
+
+services:
+  - packer
+
+env:
+  global:
+    - secure: "Dgcn3D8FnhU35y57k5uL1QIyHCV0I++GvPWOaj8McA8xFFsn7WJrvr+WDQ6gGlnwhg5Nc60iY3nX7X2L3QV8oBC4Px2gXmbX4+rTin6Kh1w7TicyIHkSCWEMLB4mK/rNOIYpVqlTONoiI2DIgyzFw0hEeUBKQh5PQnn/Sy1qA2LL9WL7WsFgjW4pCOrjVc+EeglVl7jREE1fXrHoAs5MXlCDSkjLD46lZ/MfDMrNriMndqtC8Nsc0f9ytyPwUMF1Fh0KgEdC8pdE/ICGWatx7ZkA5WoZ4WHFc3pteKL0P1H77iroYGZu/n9szWkCXh+b98A1wt7YqDcKCz8OZCKTBFbCfnvMAeMbI1q8eHOi5C1y7mVpafp5nu5unJbV24ah7u/sk0npRVNthMCgxc8wupXDvIPsWF2N9p7f+YhEDnnNtljVEMzibpkPhLiwQ06S9sgxkTB2dPGpTKIOb7U5J7LPqLLlWacGzUySYWtSKaU9yMi86NK2ys1RGD5MzCY3NDi/AZ7haH6sdHOaPApEpT+JfPf8leECxP50fcXIxiBqQd3Jd4MJlLg/VdTajfTVPmO3PeflydjeS35/FQdXwrcUS38/iVqp9gKFHUo0zIGWIfirz1TUCrdt7GGxnQLsgEXYSBsonRhbd95qzBKQJCRBAh6XgUZgmCw7BmcPhJI="
+    - secure: "nITiZ7S1cQsp9gfIOCSo8o1Ntr2raUOHFZche4tndzvxA9fJCyuL/rWZscD3DRTKiI7RVQxEQqJ/4mQQWSlyYzlI7DyLgt5CicoMNgnOYMukDNRnhGJ4bRionsn4J3s6eWV6VGUBYjZHlNaSemyqLrWXdyPkJux2kYT1uFH4iJkNcbLwr7WTi+dyCBz6HmGKAJW30wZW+PFYvyuVQGQ4SAL8uu8ttgNH2Mgc1LbRTnuViE6a/Aq1e7a59QPD3O045dzpcpjPgemiz/ohv5PqQRlHAO+UKiw4mzp08mTvyn5qJJnRpXOGl9YURr72xK4KfCdKPBlfFxXnkewZ7uzJgH+x0SXb9dJoMf+sWX3+vqMVp+YiW1KtjF+tR6LLLIDQboyuJTg4ptL+cHb++tqs6ldEbFbxPiEHpQbz0WPYMXS8Ur1uCakDSiCZ3HymA/D9dnALEDawYn34HvhG6dolhcYLMJvSsoHUjXLWZFBX0vORkdXwdX/AC1aiDmbLWONj7S27Xj+aG1oIe7MYvbynIHUrWmwHhE9cUI2a7mMowiKZIIY6AHvnjG8z93UaMQgegb8m6+/lP+V1AKu8JoDSamHWFLGu8JO9iga6O+WI2c5XhfwgQjF3tERdLiQVhwTLCdaQTUiXUPMo0vB0HRjT42KY3tRZkmdLf8puwiW6sxU="
 
 # quicker travis
 # https://github.com/Gizra/elm-spa-example/commit/dc0b543403f98c3255b293227fdfb97d4940cc17
@@ -33,4 +44,10 @@ install:
 
 before_script:
 # quicker travis
+# =========================
   - $TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2 webpack
+#==========================
+  - chmod +x packer-run.sh
+
+script:
+  - ./packer-run.sh

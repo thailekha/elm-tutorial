@@ -1,13 +1,12 @@
-dist: trusty
-sudo: required
+language: 
+  - go
+  - node_js
 
-language: node_js
+go:
+  - 1.9
 
 node_js:
   - "6.11.2"
-
-services:
-  - packer
 
 env:
   global:
@@ -24,6 +23,8 @@ cache:
 #==========================
 
 before_install:
+  - go get github.com/hashicorp/packer
+  - packer -v
   - npm i -g elm webpack
 
 install: 
@@ -47,7 +48,7 @@ before_script:
 # =========================
   - $TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2 webpack
 #==========================
-  - chmod +x packer-run.sh
+  - chmod +x ./scripts/packer-run.sh
 
 script:
-  - ./packer-run.sh
+  - ./scripts/packer-run.sh

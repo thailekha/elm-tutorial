@@ -18,7 +18,7 @@
   "provisioners": [
     {
       "type": "shell",
-      "script": "provision.sh"
+      "script": "./scripts/provision.sh"
     }
   ]
 }
